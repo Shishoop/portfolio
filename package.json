@@ -1,0 +1,9 @@
+{
+  "name": "lontoc_portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo \"No build needed for static HTML/CSS site\"",
+    "start": "echo \"Open index.html directly or use a local static server\""
+  }
+}
