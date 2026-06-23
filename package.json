@@ -1,9 +1,19 @@
 {
-  "name": "lontoc_portfolio",
-  "version": "1.0.0",
+  "name": "lontoc-portfolio",
   "private": true,
+  "version": "2.0.0",
+  "type": "module",
   "scripts": {
-    "build": "echo \"No build needed for static HTML/CSS site\"",
-    "start": "echo \"Open index.html directly or use a local static server\""
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.7"
   }
 }
