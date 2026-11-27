@@ -94,7 +94,7 @@
     list.forEach(function (p, i) {
       var card = h('div', { class: 'card' + (p.published ? '' : ' draft'), draggable: 'true' },
         h('button', { type: 'button', class: 'open', 'aria-label': 'Edit ' + (p.title || 'project'), onclick: function () { editor(p); } },
-          h('span', { class: 'fwrap' }, folder(Store.shade(cat), p.published ? {} : { dashed: true }),
+          h('span', { class: 'fwrap' }, folder(p.color || Store.shade(cat), p.published ? {} : { dashed: true }),
             p.images[0] ? img(p.images[0], 'cover', '') : null),
           h('span', { class: 'name', text: (p.title || 'Untitled') + (p.published ? '' : ' (draft)') })),
         h('div', { class: 'order' },
@@ -127,6 +127,10 @@
     var thumbs = h('div', { class: 'thumbs' });
     var title = h('input', { type: 'text', value: p.title, placeholder: 'Brand identity for a local cafe' });
     var role = h('input', { type: 'text', value: p.role || '', placeholder: 'Front-end developer' });
+    var color = h('input', { type: 'color', value: p.color || Store.shade(p.category), 'aria-label': 'Folder colour' });
+    var custom = h('input', { type: 'checkbox' });
+    custom.checked = !!p.color;
+    color.addEventListener('input', function () { custom.checked = true; });
     var category = h('select', null, CATS.map(function (c, i) { return h('option', { value: c, selected: c === p.category, text: C.site.roles[i] }); }));
     var desc = h('textarea', { placeholder: 'What the project was and what you did' });
     desc.value = p.description;
@@ -181,7 +185,7 @@
       e.preventDefault();
       if (!title.value.trim()) { note.textContent = 'Give the project a title.'; title.focus(); return; }
       if (link.value.trim() && !/^https?:\/\//i.test(link.value.trim())) { note.textContent = 'Links need to start with https://'; link.focus(); return; }
-      p.title = title.value.trim(); p.role = role.value.trim(); p.category = category.value; p.description = desc.value.trim();
+      p.title = title.value.trim(); p.role = role.value.trim(); p.color = custom.checked ? color.value : ''; p.category = category.value; p.description = desc.value.trim();
       p.link = link.value.trim(); p.published = published.checked;
       if (isNew) C.projects.push(p);
       else {
@@ -197,6 +201,7 @@
         h('div', null, drop, thumbs, h('p', { class: 'note', text: 'The first image is the cover.' })),
         h('div', { class: 'form' },
           field('Title', title), field('Your role on it', role), field('Category', category), field('Description', desc),
+          h('div', { class: 'field' }, 'Folder colour', h('div', { class: 'color-row' }, color, h('label', { class: 'check' }, custom, 'Use this colour (untick for the default shade)'))),
           h('label', { class: 'field' }, linkLabel, link),
           h('label', { class: 'check' }, published, 'Published (visible on the site)'),
           note,

@@ -468,3 +468,6 @@ html.locked, html.locked body { overflow: hidden; }
   .book.single .sheet.text p { font-size: 14px; }
 }
 @media (prefers-reduced-motion: reduce) { .sheet.slide-next, .sheet.slide-prev { animation: none; } }
+/* ===== version 15: an open folder takes its project's colour ===== */
+.dossier, .dossier .dtab { background: var(--fc, var(--line)); }
+.dossier .dtab, .dossier .x, .dossier .count { color: var(--fct, #fff); }

@@ -359,7 +359,7 @@
 
   /* ---------- about ---------- */
   function about() {
-    app.append(nav(), h('h1', { class: 'sr-only', text: 'About' }), marquee(), aboutBlock(true), tools(), footer(), toTop());
+    app.append(nav(), h('h1', { class: 'sr-only', text: 'About' }), marquee(), aboutBlock(true), footer(), toTop());
   }
 
   /* ---------- projects ---------- */
@@ -453,8 +453,8 @@
   function developer(list) {
     var grid = h('div', { class: 'folders' });
     list.forEach(function (p, n) {
-      grid.append(h('button', { onclick: function (e) { popup(p, e.currentTarget); } },
-        h('span', { class: 'fwrap', style: 'display:block' }, folder(SHADES[n % 4], { strip: true })),
+      grid.append(h('button', { onclick: function (e) { popup(p, e.currentTarget, p.color || SHADES[n % 4]); } },
+        h('span', { class: 'fwrap', style: 'display:block' }, folder(p.color || SHADES[n % 4], { strip: true })),
         h('span', { class: 'name', text: p.title })));
     });
     // Dotted folders fill the rest of the grid. Only a signed-in admin gets the "+" shortcut.
@@ -470,7 +470,15 @@
   // One project opens as a folder lying flat, a sheet of paper on each side (one sheet on a phone).
   // Nothing inside it scrolls: long writing runs on to the next sheet like a thesis, and the arrows,
   // the mouse wheel, a swipe or the arrow keys all turn the page. The X is the only way out.
-  function popup(p, opener) {
+  // Picks black or white lettering so it stays readable on whatever folder colour was chosen.
+  function tint(color) {
+    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color || '');
+    if (!m) return '';
+    var lum = (parseInt(m[1], 16) * 299 + parseInt(m[2], 16) * 587 + parseInt(m[3], 16) * 114) / 1000;
+    return '--fc:' + color + ';--fct:' + (lum > 150 ? '#000' : '#fff');
+  }
+
+  function popup(p, opener, color) {
     var narrow = window.matchMedia('(max-width: 760px)').matches;
     var flat = narrow || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var per = narrow ? 1 : 2; // sheets visible at once
@@ -481,7 +489,7 @@
     var next = h('button', { class: 'chev', 'aria-label': 'Next page', onclick: function () { turn(1); } }, UI.arrow('right'));
     var close = h('button', { class: 'x', 'aria-label': 'Close', text: '✕', onclick: done });
     var overlay = h('div', { class: 'overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': p.title || 'Project' },
-      prev, h('div', { class: 'dossier' }, h('div', { class: 'dtab', text: p.title }), close, book, count), next);
+      prev, h('div', { class: 'dossier', style: tint(color) }, h('div', { class: 'dtab', text: p.title }), close, book, count), next);
     var pages = [], spreads = 1, s = 0, busy = false, last = 0;
     var blank = function () { return h('div', { class: 'sheet blank' }); };
 

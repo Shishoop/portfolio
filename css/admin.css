@@ -85,3 +85,7 @@ label.btn { cursor: pointer; }
   .edit .form { padding: 0; }
   .tabs button { font-size: 12px; }
 }
+
+.color-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.field .color-row input[type="color"] { width: 58px; height: 38px; padding: 2px; cursor: pointer; flex: none; }
+.field .color-row .check input { width: 18px; height: 18px; padding: 0; }
