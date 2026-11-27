@@ -600,3 +600,5 @@ html.locked, html.locked body { overflow: hidden; }
 /* ===== version 28: the white strip is always filled edge to edge, whatever angle the flap is at ===== */
 .fopen .ffront { clip-path: polygon(0 12%, 50% 12%, 58% 0, 100% 0, 100% 100%, 0 100%); }
 .fopen .ffront i { display: block; left: 62%; width: 28%; top: 6.6%; height: 6.6%; background: #fff; }
+/* ===== version 29: the white bar runs out to the same right-hand margin it had in the original design ===== */
+.fopen .ffront i { left: 62%; width: 34.25%; }
