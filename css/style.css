@@ -597,3 +597,6 @@ html.locked, html.locked body { overflow: hidden; }
   .dossier { margin-left: 30px; }
   .dossier::after { content: ''; position: absolute; right: 100%; top: 0; bottom: 0; width: 30px; background: var(--fc, var(--line)); clip-path: polygon(100% 44%, 0 calc(44% + 30px), 0 100%, 100% 100%); pointer-events: none; }
 }
+/* ===== version 28: the white strip is always filled edge to edge, whatever angle the flap is at ===== */
+.fopen .ffront { clip-path: polygon(0 12%, 50% 12%, 58% 0, 100% 0, 100% 100%, 0 100%); }
+.fopen .ffront i { display: block; left: 62%; width: 28%; top: 6.6%; height: 6.6%; background: #fff; }
