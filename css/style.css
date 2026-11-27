@@ -183,13 +183,13 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .px-arrow { display: block; height: auto; animation: bob 1.5s ease-in-out infinite; }
 @keyframes bob { 0%, 100% { transform: translateY(-3px); } 50% { transform: translateY(3px); } }
 .catnav .arrow { margin: 6px 0 4px; }
-.catnav .arrow .px-arrow { width: clamp(12px, 1.1vw, 18px); margin: 0 auto; }
+.catnav .arrow .px-arrow { width: clamp(14px, 1.4vw, 24px); margin: 0 auto; }
 .catnav a:nth-child(2) .px-arrow { animation-delay: .15s; }
 .catnav a:nth-child(3) .px-arrow { animation-delay: .3s; }
 .catnav a:nth-child(4) .px-arrow { animation-delay: .45s; }
-.chev .px-arrow { width: clamp(14px, 1.3vw, 24px); }
+.chev .px-arrow { width: clamp(11px, 1.1vw, 20px); }
 .chev { transition: transform .3s var(--ease); }
-.totop .px-arrow { width: 16px; }
+.totop .px-arrow { width: 18px; }
 .totop { transition: transform .3s var(--ease), background .2s; }
 .totop:hover { transform: translateY(-4px); }
 a:hover .px-arrow, button:hover .px-arrow, a:focus-visible .px-arrow, button:focus-visible .px-arrow { animation-play-state: paused; }
