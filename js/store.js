@@ -21,6 +21,7 @@
         roles: ['Graphic Designer', 'Video Editor', 'UI & UX Designer', 'Developer'],
         marquee: 'ABOUT ME',
         greeting: 'Hi, my name is Shiso',
+        name: 'Shiso',
         greetingLead: "and i'm a",
         greetingRole: 'Graphic Designer',
         bio: 'I am a creative and detail-oriented Web Designer, Graphic Designer, Virtual Assistant, and Advertising enthusiast based in the Philippines. I specialize in creating visually appealing and user-friendly designs while also providing reliable remote support for administrative and digital tasks. I am passionate about combining creativity, communication, and strategy to deliver effective and engaging digital solutions.',

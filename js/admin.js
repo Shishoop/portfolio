@@ -252,7 +252,7 @@
       ['introWord', 'Intro word'],
       ['role0', 'Role 1 (black)'], ['role1', 'Role 2 (dark gray)'], ['role2', 'Role 3 (mid gray)'], ['role3', 'Role 4 (light gray)'],
       ['marquee', 'Marquee text'],
-      ['greeting', 'Greeting, line 1'], ['greetingLead', 'Greeting, line 2'], ['greetingRole', 'Greeting, bold role'],
+      ['greeting', 'Greeting, line 1'], ['name', 'Your name inside that line (clicking it opens the admin)'], ['greetingLead', 'Greeting, line 2'], ['greetingRole', 'Greeting, bold role'],
       ['bio', 'Bio', 'long'], ['whatElse', '"What else" link'],
       ['projectsTitle', 'Projects page title'], ['reelLabel', 'Demo reel placeholder'], ['copyright', 'Footer copyright']
     ], h('div', { class: 'field' }, 'Portrait', box));

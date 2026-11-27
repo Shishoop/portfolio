@@ -21,6 +21,13 @@
     return h('div', { class: 'marquee', 'aria-hidden': 'true' }, h('div', null, run));
   }
 
+  // The name inside the greeting is a quiet link to the admin sign in.
+  function greeting(s) {
+    var at = s.name ? s.greeting.indexOf(s.name) : -1;
+    if (at < 0) return s.greeting;
+    return [s.greeting.slice(0, at), h('a', { class: 'me', href: 'admin.html', 'aria-label': s.name + ', admin sign in', text: s.name }), s.greeting.slice(at + s.name.length)];
+  }
+
   function aboutBlock(open) {
     var s = C.site;
     var roles = h('div', { class: 'roles', id: 'roles', hidden: !open }, s.roles.map(function (name, i) {
@@ -35,7 +42,7 @@
     } });
     return h('section', { class: 'about', id: 'about' },
       h('div', null,
-        h('h2', null, s.greeting, h('br'), s.greetingLead + ' ', h('b', { text: s.greetingRole })),
+        h('h2', null, greeting(s), h('br'), s.greetingLead + ' ', h('b', { text: s.greetingRole })),
         h('p', { class: 'bio' }, s.bio, more),
         roles),
       h('div', { class: 'portrait' }, s.portrait ? img(s.portrait, '', 'Portrait') : null));
