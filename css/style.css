@@ -444,3 +444,10 @@ a:hover .px-arrow, button:hover .px-arrow, a:focus-visible .px-arrow, button:foc
 .sheet.pic img { display: block; }
 .page, .face { overflow: hidden; }
 .page:has(.sheet.text), .face:has(.sheet.text) { overflow: auto; }
+/* ===== version 13: folder writing runs on to further sheets, with a role line and page numbers ===== */
+.page.probe { position: absolute; left: 0; top: 0; bottom: 0; width: 50%; visibility: hidden; pointer-events: none; }
+.book:not(.stacked) .page, .book:not(.stacked) .face { overflow: hidden; }
+.sheet.text p.body { flex: none; }
+.sheet.text .role-line { flex: none; margin: -8px 0 0; color: var(--mute); font-size: clamp(11px, .9vw, 16px); }
+.sheet.text .pnum { margin-top: auto; text-align: center; color: var(--mute); font-size: 12px; line-height: 1; }
+.sheet.text .go { margin-top: 6px; }

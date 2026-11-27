@@ -126,6 +126,7 @@
     var note = h('p', { class: 'note err', role: 'alert' });
     var thumbs = h('div', { class: 'thumbs' });
     var title = h('input', { type: 'text', value: p.title, placeholder: 'Brand identity for a local cafe' });
+    var role = h('input', { type: 'text', value: p.role || '', placeholder: 'Front-end developer' });
     var category = h('select', null, CATS.map(function (c, i) { return h('option', { value: c, selected: c === p.category, text: C.site.roles[i] }); }));
     var desc = h('textarea', { placeholder: 'What the project was and what you did' });
     desc.value = p.description;
@@ -180,7 +181,7 @@
       e.preventDefault();
       if (!title.value.trim()) { note.textContent = 'Give the project a title.'; title.focus(); return; }
       if (link.value.trim() && !/^https?:\/\//i.test(link.value.trim())) { note.textContent = 'Links need to start with https://'; link.focus(); return; }
-      p.title = title.value.trim(); p.category = category.value; p.description = desc.value.trim();
+      p.title = title.value.trim(); p.role = role.value.trim(); p.category = category.value; p.description = desc.value.trim();
       p.link = link.value.trim(); p.published = published.checked;
       if (isNew) C.projects.push(p);
       else {
@@ -195,7 +196,7 @@
       h('div', { class: 'cols' },
         h('div', null, drop, thumbs, h('p', { class: 'note', text: 'The first image is the cover.' })),
         h('div', { class: 'form' },
-          field('Title', title), field('Category', category), field('Description', desc),
+          field('Title', title), field('Your role on it', role), field('Category', category), field('Description', desc),
           h('label', { class: 'field' }, linkLabel, link),
           h('label', { class: 'check' }, published, 'Published (visible on the site)'),
           note,
