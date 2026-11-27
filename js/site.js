@@ -103,9 +103,10 @@
     // Stays out of the way of the footer links at the very bottom of the page.
     var place = function () {
       var nearEnd = window.innerHeight + window.scrollY > document.documentElement.scrollHeight - 140;
-      b.style.visibility = nearEnd && window.scrollY > 0 ? 'hidden' : '';
+      b.style.visibility = nearEnd || window.scrollY < 200 ? 'hidden' : '';
     };
     window.addEventListener('scroll', place, { passive: true });
+    place();
     return b;
   }
 
@@ -294,10 +295,10 @@
   function projects() {
     var s = C.site;
     var render = { graphic: graphic, video: video, uiux: uiux, developer: developer };
-    app.append(nav(), h('h1', { class: 'ptitle', text: s.projectsTitle }),
+    app.append(h('header', { class: 'phero' }, nav(), h('div', { class: 'pmid' }, h('h1', { class: 'ptitle', text: s.projectsTitle })),
       h('nav', { class: 'catnav', 'aria-label': 'Project categories' }, CATS.map(function (c, i) {
         return h('a', { href: '#' + c }, s.roles[i], h('span', { class: 'arrow' }, UI.arrow('down')), h('span', { class: 'bar b' + (i + 1) }));
-      })));
+      }))));
     CATS.forEach(function (c, i) {
       var list = byCat(c);
       var body;
@@ -385,7 +386,7 @@
       });
     }, { rootMargin: '0px 0px -6% 0px' });
     var counts = new Map();
-    var pick = '.mark, .hero-foot, .about > *, .tools img, .ptitle, .catnav a, .section > h2, .gd > *, .section > div:not(.gd):not(.folders), .folders > *, .chead, .card-wrap, .contact-page > .blurb, .contact-page > .win, .footer .row';
+    var pick = '.mark, .hero-foot, .about > *, .tools img, .ptitle, .section > h2, .gd > *, .section > div:not(.gd):not(.folders), .folders > *, .chead, .card-wrap, .contact-page > .blurb, .contact-page > .win, .footer .row';
     Array.prototype.forEach.call(document.querySelectorAll(pick), function (el) {
       var n = counts.get(el.parentNode) || 0;
       counts.set(el.parentNode, n + 1);
