@@ -74,12 +74,21 @@
       h('div', { class: 'portrait' }, s.portrait ? img(s.portrait, '', 'Portrait') : null));
   }
 
+  // Each icon gets its own size, height and spacing so the row reads as scattered, then the whole band drifts sideways.
+  var SCATTER = [
+    [1.25, 0.08, 0.9], [0.7, 0.52, 0.5], [1.5, 0.3, 1.1], [0.85, 0.02, 0.6], [1.1, 0.5, 0.8], [0.6, 0.22, 0.45], [1.4, 0.04, 1.0],
+    [0.9, 0.46, 0.7], [1.2, 0.2, 0.55], [0.65, 0.6, 0.9], [1.55, 0.26, 0.75], [0.8, 0.0, 0.5], [1.05, 0.42, 1.0]
+  ];
   function tools() {
-    return h('div', { class: 'tools', 'aria-label': 'Tools I use' }, TOOLS.map(function (t) {
-      return h('img', { src: 'assets/tools/' + t + '.png', alt: t, loading: 'lazy' });
-    }));
+    function set(hidden) {
+      return TOOLS.map(function (t, i) {
+        var p = SCATTER[i % SCATTER.length];
+        return h('img', { src: 'assets/tools/' + t + '.png', alt: hidden ? '' : t, 'aria-hidden': hidden ? 'true' : null,
+          style: '--s:' + p[0] + ';--y:' + p[1] + ';--g:' + p[2] + ';--d:' + (i * -0.7).toFixed(1) + 's' });
+      });
+    }
+    return h('div', { class: 'tools-flow', 'aria-label': 'Tools I use' }, h('div', { class: 'tools-track' }, set(false), set(true)));
   }
-
   function link(label, href) {
     return href ? h('a', { href: href, target: '_blank', rel: 'noopener', text: label }) : h('a', { text: label });
   }
@@ -205,7 +214,7 @@
     var cells = h('div', { class: 'cells' }, list.map(function (p, n) {
       return h('button', { 'aria-label': p.title || 'Project ' + (n + 1), onclick: function () { show(n); } }, p.images[0] ? img(p.images[0], '', '') : null);
     }));
-    for (var k = list.length; k < 14; k++) cells.append(h('span', { class: 'cell', 'aria-hidden': 'true' }));
+    for (var k = list.length; k < 22; k++) cells.append(h('span', { class: 'cell', 'aria-hidden': 'true' }));
     var thumb = h('div', { class: 'sthumb' });
     var sbar = h('div', { class: 'sbar', 'aria-hidden': 'true' }, thumb);
     function show(n) {
@@ -216,19 +225,16 @@
       view.scrollTop = 0;
       Array.prototype.forEach.call(cells.children, function (b, n2) { n2 === n ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current'); });
     }
-    // The scrollbar is drawn to match the design and follows the thumbnail list.
+    // The scrollbar keeps its designed look: the thumb stays one size and rides the track as the list scrolls.
     function sync() {
-      var max = cells.scrollHeight - cells.clientHeight, track = sbar.clientHeight;
-      if (max <= 1) { thumb.style.height = ''; thumb.style.top = ''; return; }
-      var size = Math.max(24, track * cells.clientHeight / cells.scrollHeight);
-      thumb.style.height = size + 'px';
-      thumb.style.top = (cells.scrollTop / max) * (track - size) + 'px';
+      var max = cells.scrollHeight - cells.clientHeight, travel = sbar.clientHeight - thumb.offsetHeight;
+      thumb.style.top = (max > 1 ? (cells.scrollTop / max) * travel : 0) + 'px';
     }
     function jump(e) {
-      var r = sbar.getBoundingClientRect();
-      cells.scrollTop = ((e.clientY - r.top) / r.height) * (cells.scrollHeight - cells.clientHeight);
-    }
-    cells.addEventListener('scroll', sync);
+      var r = sbar.getBoundingClientRect(), size = thumb.offsetHeight;
+      var ratio = Math.min(1, Math.max(0, (e.clientY - r.top - size / 2) / (r.height - size)));
+      cells.scrollTop = ratio * (cells.scrollHeight - cells.clientHeight);
+    }    cells.addEventListener('scroll', sync);
     window.addEventListener('resize', sync);
     sbar.addEventListener('pointerdown', function (e) { sbar.setPointerCapture(e.pointerId); jump(e); });
     sbar.addEventListener('pointermove', function (e) { if (sbar.hasPointerCapture(e.pointerId)) jump(e); });
@@ -386,7 +392,7 @@
       });
     }, { rootMargin: '0px 0px -6% 0px' });
     var counts = new Map();
-    var pick = '.mark, .hero-foot, .about > *, .tools img, .ptitle, .section > h2, .gd > *, .section > div:not(.gd):not(.folders), .folders > *, .chead, .card-wrap, .contact-page > .blurb, .contact-page > .win, .footer .row';
+    var pick = '.mark, .hero-foot, .about > *, .tools-flow, .ptitle, .section > h2, .gd > *, .section > div:not(.gd):not(.folders), .folders > *, .chead, .card-wrap, .contact-page > .blurb, .contact-page > .win, .footer .row';
     Array.prototype.forEach.call(document.querySelectorAll(pick), function (el) {
       var n = counts.get(el.parentNode) || 0;
       counts.set(el.parentNode, n + 1);

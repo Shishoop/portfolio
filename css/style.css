@@ -354,3 +354,23 @@ a:hover .px-arrow, button:hover .px-arrow, a:focus-visible .px-arrow, button:foc
 @media (prefers-reduced-motion: reduce) { .catnav a { animation: none; } }
 /* nav links carry no underline, on hover or on the current page */
 .nav a, .nav a:hover, .nav a[aria-current] { background: none; text-decoration: none; padding-bottom: 0; }
+/* ===== version 6: scattered tool icons drifting sideways, working UI & UX scrollbar ===== */
+.tools-flow { --h: clamp(170px, 19vw, 340px); --base: clamp(34px, 4.1vw, 78px); height: var(--h); overflow: hidden; margin: 0 0 clamp(40px, 5vw, 90px);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent); mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent); }
+.tools-track { display: flex; align-items: flex-start; width: max-content; height: 100%; animation: drift 46s linear infinite; }
+.tools-flow:hover .tools-track { animation-play-state: paused; }
+.tools-track img { flex: none; width: calc(var(--base) * var(--s)); margin-top: calc(var(--h) * var(--y)); margin-right: calc(var(--base) * var(--g)); animation: hover-bob 5s ease-in-out infinite; animation-delay: var(--d); transition: transform .4s var(--ease); }
+@keyframes drift { to { transform: translateX(-50%); } }
+@keyframes hover-bob { 0%, 100% { translate: 0 -5px; } 50% { translate: 0 7px; } }
+.tools-track img:hover { transform: scale(1.14) rotate(-4deg); }
+
+#uiux .sthumb { top: 0; cursor: grab; }
+#uiux .sbar:active .sthumb { cursor: grabbing; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tools-track, .tools-track img { animation: none !important; }
+  .tools-flow { height: auto; overflow: visible; -webkit-mask-image: none; mask-image: none; }
+  .tools-track { width: auto; flex-wrap: wrap; justify-content: center; }
+  .tools-track img[aria-hidden] { display: none; }
+  .tools-track img { margin-top: 0; }
+}
