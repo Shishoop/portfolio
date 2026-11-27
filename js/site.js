@@ -199,8 +199,13 @@
         h('span', { class: 'fwrap', style: 'display:block' }, folder(SHADES[n % 4], { strip: true })),
         h('span', { class: 'name', text: p.title })));
     });
-    var slots = Math.max(6, Math.ceil(list.length / 3) * 3);
-    for (var k = list.length; k < slots; k++) grid.append(h('div', { 'aria-hidden': 'true' }, folder('', { dashed: true, plus: true })));
+    // The empty "+" folders are an admin shortcut: visitors never see them.
+    if (Store.signedIn()) {
+      var slots = Math.max(6, Math.ceil((list.length + 1) / 3) * 3);
+      for (var k = list.length; k < slots; k++) {
+        grid.append(h('a', { href: 'admin.html', 'aria-label': 'Add a project in the admin' }, h('span', { class: 'fwrap', style: 'display:block' }, folder('', { dashed: true, plus: true }))));
+      }
+    }
     return grid;
   }
 
@@ -250,7 +255,7 @@
       var list = byCat(c);
       var body;
       if (c === 'uiux') body = uiux(list, s.roles[i]);
-      else if (!list.length) body = h('p', { class: 'empty', text: 'New work coming soon.' });
+      else if (!list.length && !(c === 'developer' && Store.signedIn())) body = h('p', { class: 'empty', text: 'New work coming soon.' });
       else body = render[c](list);
       app.append(h('section', { class: 'section' + (c === 'developer' ? ' dev' : ''), id: c },
         c === 'uiux' ? h('h2', { class: 'sr-only', text: s.roles[i] }) : h('h2', { text: s.roles[i] }), body));
