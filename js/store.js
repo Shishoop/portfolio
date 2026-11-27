@@ -127,6 +127,8 @@
     });
   }
 
+  // Default admin sign in, kept only as a salted hash. It can be changed from Admin > Backup.
+  var BUILT_IN = { salt: 'pf-2026', hash: '2c1b28e10c57d42329d632771ddb1081d9172cf6b73f3413ac079ada2551e294' };
   var Local = {
     SHADES: SHADES,
     CATEGORIES: CATEGORIES,
@@ -167,14 +169,14 @@
       return Local.messages().then(function (list) { return kvSet('messages', list.filter(function (x) { return x.id !== m.id; })); });
     },
 
-    hasPassword: function () { return kvGet('auth').then(function (a) { return !!a; }); },
+    hasPassword: function () { return Promise.resolve(true); },
     setPassword: function (password) {
       var salt = uid();
       return hash(password, salt).then(function (h) { return kvSet('auth', { salt: salt, hash: h }); });
     },
     signIn: function (password) {
       return kvGet('auth').then(function (a) {
-        if (!a) return false;
+        a = a || BUILT_IN;
         return hash(password, a.salt).then(function (h) {
           if (h === a.hash) { sessionStorage.setItem('admin', '1'); return true; }
           return false;

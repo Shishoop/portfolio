@@ -413,3 +413,34 @@ a:hover .px-arrow, button:hover .px-arrow, a:focus-visible .px-arrow, button:foc
 .liquid { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; opacity: 0; }
 .mark.liquid-on img, .mark.liquid-on .tag { visibility: hidden; }
 .mark .tag { animation: none; }
+/* ===== version 12: a project opens as a flat folder with two sheets; arrows turn the page ===== */
+.dossier { position: relative; background: var(--line); padding: 30px 20px 14px; margin-top: 30px; animation: pop .5s var(--ease) both; }
+.dossier .dtab { position: absolute; left: 0; bottom: 100%; height: 30px; min-width: 36%; max-width: 70%; padding: 0 46px 0 16px; background: var(--line); color: #fff; font-size: 14px; line-height: 30px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; clip-path: polygon(0 0, calc(100% - 30px) 0, 100% 100%, 0 100%); }
+.dossier .x { position: absolute; top: 3px; right: 8px; color: #fff; font-family: var(--font-sans); font-size: 22px; line-height: 1; padding: 2px; z-index: 5; }
+.book { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); height: min(64vh, 560px); perspective: 2400px; }
+.page, .face { background: #fff; padding: clamp(14px, 2vw, 30px); overflow: auto; }
+.page.left { box-shadow: inset -22px 0 26px -22px rgba(0, 0, 0, .28); border-right: 1px solid #cfcfcf; }
+.page.right { box-shadow: inset 22px 0 26px -22px rgba(0, 0, 0, .22); }
+.leaf { position: absolute; top: 0; bottom: 0; width: 50%; transform-style: preserve-3d; z-index: 3; }
+.leaf.next { right: 0; transform-origin: left center; }
+.leaf.prev { left: 0; transform-origin: right center; }
+.face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden; box-shadow: 0 0 30px rgba(0, 0, 0, .25); }
+.face.back { transform: rotateY(180deg); }
+.sheet { height: 100%; }
+.sheet.pic { background: var(--ph); display: grid; place-items: center; }
+.sheet.pic img { width: 100%; height: 100%; object-fit: contain; background: #f3f3f3; }
+.sheet.text { display: flex; flex-direction: column; gap: 14px; }
+.sheet.text h3 { font-weight: 400; margin: 0; font-size: clamp(16px, 1.4vw, 26px); }
+.sheet.text p { margin: 0; flex: 1; font-size: clamp(12px, 1vw, 18px); white-space: pre-line; }
+.sheet.text .go { background: var(--ph); text-align: center; padding: 12px; text-decoration: none; display: block; transition: background .25s, color .25s; }
+.sheet.text .go:hover { background: #000; color: #fff; }
+.dossier .count { color: #fff; text-align: center; font-size: 13px; min-height: 20px; padding-top: 8px; }
+@media (max-width: 760px) {
+  .book { grid-template-columns: minmax(0, 1fr); height: auto; max-height: 72vh; overflow: auto; }
+  .page.left { border-right: 0; border-bottom: 1px solid #cfcfcf; box-shadow: none; min-height: 46vw; }
+  .page.right { box-shadow: none; }
+  .dossier { padding: 28px 8px 10px; }
+}.sheet.pic { display: block; overflow: hidden; }
+.sheet.pic img { display: block; }
+.page, .face { overflow: hidden; }
+.page:has(.sheet.text), .face:has(.sheet.text) { overflow: auto; }

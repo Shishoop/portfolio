@@ -453,7 +453,7 @@
   function developer(list) {
     var grid = h('div', { class: 'folders' });
     list.forEach(function (p, n) {
-      grid.append(h('button', { onclick: function (e) { popup(list, n, e.currentTarget); } },
+      grid.append(h('button', { onclick: function (e) { popup(p, e.currentTarget); } },
         h('span', { class: 'fwrap', style: 'display:block' }, folder(SHADES[n % 4], { strip: true })),
         h('span', { class: 'name', text: p.title })));
     });
@@ -467,29 +467,58 @@
     return grid;
   }
 
-  function popup(list, start, opener) {
-    var i = start;
-    var panel = h('div', { class: 'panel' });
+  // One project opens as a folder lying flat, a sheet of paper on each side. The arrows turn its pages.
+  // The X is the only way out, so each folder is looked at on its own before opening another.
+  function popup(p, opener) {
+    function pic(ref) { return function () { return h('div', { class: 'sheet pic' }, ref ? img(ref, '', p.title) : null); }; }
+    function words() {
+      return h('div', { class: 'sheet text' }, h('h3', { text: p.title }), h('p', { text: p.description }),
+        p.link ? h('a', { class: 'go', href: p.link, target: '_blank', rel: 'noopener', text: 'View project' }) : null);
+    }
+    var pages = [pic(p.images[0] || ''), words];
+    p.images.slice(1).forEach(function (r) { pages.push(pic(r)); });
+    if (pages.length % 2) pages.push(function () { return h('div', { class: 'sheet blank' }); });
+    var spreads = pages.length / 2, s = 0, busy = false;
+    var flat = window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches;
+
+    var left = h('div', { class: 'page left' }, pages[0]());
+    var right = h('div', { class: 'page right' }, pages[1]());
+    var book = h('div', { class: 'book' }, left, right);
+    var count = h('div', { class: 'count', 'aria-live': 'polite' });
+    var prev = h('button', { class: 'chev', 'aria-label': 'Previous page', onclick: function () { turn(-1); } }, UI.arrow('left'));
+    var next = h('button', { class: 'chev', 'aria-label': 'Next page', onclick: function () { turn(1); } }, UI.arrow('right'));
     var close = h('button', { class: 'x', 'aria-label': 'Close', text: '✕', onclick: done });
-    var overlay = h('div', { class: 'overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Project' },
-      h('button', { class: 'chev', 'aria-label': 'Previous project', onclick: function () { show(i - 1); } }, UI.arrow('left')),
-      h('div', { class: 'pop' }, close, panel),
-      h('button', { class: 'chev', 'aria-label': 'Next project', onclick: function () { show(i + 1); } }, UI.arrow('right')));
-    function show(n) {
-      i = (n + list.length) % list.length;
-      var p = list[i];
-      var pics = h('div', { class: 'pics' });
-      var refs = p.images.length ? p.images : ['', ''];
-      refs.forEach(function (r) { pics.append(r ? img(r, '', p.title) : h('div')); });
-      panel.replaceChildren(pics, h('div', { class: 'text' },
-        h('h3', { text: p.title }), h('p', { text: p.description }),
-        p.link ? h('a', { class: 'go', href: p.link, target: '_blank', rel: 'noopener', text: 'View project' }) : null));
-      panel.classList.remove('swap'); void panel.offsetWidth; panel.classList.add('swap');
+    var overlay = h('div', { class: 'overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': p.title || 'Project' },
+      prev, h('div', { class: 'dossier' }, h('div', { class: 'dtab', text: p.title }), close, book, count), next);
+
+    function update() {
+      count.textContent = spreads > 1 ? (s + 1) + ' / ' + spreads : '';
+      prev.style.visibility = s > 0 ? '' : 'hidden';
+      next.style.visibility = s < spreads - 1 ? '' : 'hidden';
+    }
+    // Turning forward lifts the right sheet over the spine; its back is the next left sheet.
+    function turn(dir) {
+      var t = s + dir;
+      if (busy || t < 0 || t >= spreads) return;
+      if (flat) { s = t; left.replaceChildren(pages[2 * s]()); right.replaceChildren(pages[2 * s + 1]()); update(); return; }
+      busy = true;
+      var fwd = dir > 0;
+      var leaf = h('div', { class: 'leaf ' + (fwd ? 'next' : 'prev') },
+        h('div', { class: 'face front' }, pages[fwd ? 2 * s + 1 : 2 * s]()),
+        h('div', { class: 'face back' }, pages[fwd ? 2 * t : 2 * t + 1]()));
+      (fwd ? right : left).replaceChildren(pages[fwd ? 2 * t + 1 : 2 * t]());
+      book.appendChild(leaf);
+      leaf.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(' + (fwd ? -180 : 180) + 'deg)' }],
+        { duration: 900, easing: 'cubic-bezier(.45, .05, .2, 1)', fill: 'forwards' }).onfinish = function () {
+        (fwd ? left : right).replaceChildren(pages[fwd ? 2 * t : 2 * t + 1]());
+        leaf.remove();
+        s = t; busy = false; update();
+      };
     }
     function key(e) {
       if (e.key === 'Escape') done();
-      if (e.key === 'ArrowLeft') show(i - 1);
-      if (e.key === 'ArrowRight') show(i + 1);
+      if (e.key === 'ArrowLeft') turn(-1);
+      if (e.key === 'ArrowRight') turn(1);
     }
     function done() {
       document.removeEventListener('keydown', key);
@@ -497,13 +526,11 @@
       setTimeout(function () { overlay.remove(); }, 220);
       if (opener) opener.focus();
     }
-    overlay.addEventListener('click', function (e) { if (e.target === overlay) done(); });
     document.addEventListener('keydown', key);
-    show(i);
+    update();
     document.body.appendChild(overlay);
     close.focus();
   }
-
   function projects() {
     var s = C.site;
     var render = { graphic: graphic, video: video, uiux: uiux, developer: developer };
