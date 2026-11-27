@@ -554,7 +554,8 @@
     var next = h('button', { class: 'chev', 'aria-label': 'Next page', onclick: function () { turn(1); } }, UI.arrow('right'));
     var close = h('button', { class: 'x', 'aria-label': 'Close', text: '✕', onclick: done });
     var overlay = h('div', { class: 'overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': p.title || 'Project' },
-      prev, h('div', { class: 'dossier', style: tint(color) }, h('div', { class: 'dtab', text: p.title }), close, spread, count), next);
+      prev, h('div', { class: 'dossier', style: tint(color) }, h('div', { class: 'dtab', text: p.title }),
+        h('span', { class: 'stab l' }), h('span', { class: 'stab r' }), close, spread, count), next);
     var pages = [], s = 0, busy = false, last = 0, L = null, R = null;
 
     function pic(ref) { return function () { return h('div', { class: 'sheet pic' }, img(ref, '', p.title)); }; }

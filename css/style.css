@@ -564,3 +564,8 @@ html.locked, html.locked body { overflow: hidden; }
 @keyframes lid-open { from { transform: perspective(1800px) rotateX(0deg); opacity: 1; } 80% { opacity: 1; } to { transform: perspective(1800px) rotateX(-90deg); opacity: 0; } }
 @media (max-width: 760px) { .dossier::before { display: none; } }
 @media (prefers-reduced-motion: reduce) { .fopen .ffront, .fopen .fpaper, .fopen .folder-svg { transition: none; } .lid { display: none; } }
+/* ===== version 23: the open folder has the side tabs of a card file folder ===== */
+.dossier .stab { position: absolute; width: clamp(8px, 1vw, 14px); background: var(--fc, var(--line)); pointer-events: none; }
+.dossier .stab.l { right: 100%; top: 24%; bottom: 0; clip-path: polygon(100% 0, 0 14px, 0 calc(100% - 8px), 8px 100%, 100% 100%); }
+.dossier .stab.r { left: 100%; top: 0; height: 26%; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 14px), 0 100%); }
+@media (max-width: 760px) { .dossier .stab { display: none; } }
