@@ -395,5 +395,19 @@
     });
     return svg;
   }
-  window.UI = { h: h, img: img, folder: folder, arrow: arrow };
+  // Minimise, maximise and close, drawn as thin lines like the Figma title bar.
+  function controls() {
+    var wrap = h('span', { class: 'ctl', 'aria-hidden': 'true' });
+    ['M3 12H21', 'M4 4H20V20H4Z', 'M4 4L20 20M20 4L4 20'].forEach(function (d) {
+      var svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      var p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', d); p.setAttribute('fill', 'none'); p.setAttribute('stroke', 'currentColor');
+      p.setAttribute('stroke-width', '1.5'); p.setAttribute('vector-effect', 'non-scaling-stroke');
+      svg.appendChild(p);
+      wrap.appendChild(svg);
+    });
+    return wrap;
+  }
+  window.UI = { h: h, img: img, folder: folder, arrow: arrow, controls: controls };
 })();

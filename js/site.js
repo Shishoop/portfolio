@@ -21,6 +21,24 @@
     return h('div', { class: 'marquee', 'aria-hidden': 'true' }, h('div', null, run));
   }
 
+  // Types each role in turn after "and i'm a".
+  function typed(roles) {
+    var text = h('b', { text: roles[0] });
+    var wrap = h('span', { class: 'typed', 'aria-hidden': 'true' }, text, h('span', { class: 'caret' }));
+    if (roles.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return wrap;
+    var i = 0, n = roles[0].length, deleting = true;
+    function tick() {
+      var wait;
+      if (deleting) {
+        if (n > 0) { n--; wait = 38; } else { deleting = false; i = (i + 1) % roles.length; wait = 260; }
+      } else if (n < roles[i].length) { n++; wait = 75; } else { deleting = true; wait = 1700; }
+      text.textContent = roles[i].slice(0, n);
+      setTimeout(tick, wait);
+    }
+    setTimeout(tick, 1700);
+    return wrap;
+  }
+
   // The name inside the greeting is a quiet link to the admin sign in.
   function greeting(s) {
     var at = s.name ? s.greeting.indexOf(s.name) : -1;
@@ -39,11 +57,13 @@
       e.preventDefault();
       roles.hidden = !roles.hidden;
       more.setAttribute('aria-expanded', String(!roles.hidden));
+      bio.classList.toggle('open', !roles.hidden);
     } });
+    var bio = h('p', { class: 'bio' + (open ? ' open' : '') }, s.bio, more);
     return h('section', { class: 'about', id: 'about' },
       h('div', null,
-        h('h2', null, greeting(s), h('br'), s.greetingLead + ' ', h('b', { text: s.greetingRole })),
-        h('p', { class: 'bio' }, s.bio, more),
+        h('h2', { 'aria-label': s.greeting + ' ' + s.greetingLead + ' ' + s.roles.join(', ') }, greeting(s), h('br'), s.greetingLead + ' ', typed(s.roles)),
+        bio,
         roles),
       h('div', { class: 'portrait' }, s.portrait ? img(s.portrait, '', 'Portrait') : null));
   }
@@ -186,9 +206,10 @@
       pane.scrollTop = 0;
       Array.prototype.forEach.call(side.children, function (b, n2) { n2 === n ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current'); });
     }
+    for (var k = list.length; k < 18; k++) side.append(h('span', { class: 'cell', 'aria-hidden': 'true' }));
     if (list.length) show(0);
-    return h('div', { class: 'win' },
-      h('div', { class: 'win-bar' }, title, h('span', { class: 'ctl', 'aria-hidden': 'true', text: '—□✕' })),
+    return h('div', { class: 'win uxwin' },
+      h('div', { class: 'win-bar' }, title, UI.controls()),
       h('div', { class: 'ux' }, pane, side));
   }
 
@@ -315,7 +336,7 @@
         note.textContent = "Couldn't send your message. Try again in a moment.";
       });
     } },
-      h('div', { class: 'win-bar' }, 'New message', h('span', { class: 'ctl', 'aria-hidden': 'true', text: '—□✕' })),
+      h('div', { class: 'win-bar' }, 'New message', UI.controls()),
       h('div', { class: 'form' },
         h('label', { class: 'field' }, 'Name', name),
         h('label', { class: 'field' }, 'Email', email),

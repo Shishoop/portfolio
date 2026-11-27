@@ -21,7 +21,7 @@
   function bar(title, onClose) {
     return h('div', { class: 'win-bar' }, title,
       onClose ? h('button', { class: 'ctl', type: 'button', 'aria-label': 'Close', text: '✕', onclick: onClose })
-        : h('span', { class: 'ctl', 'aria-hidden': 'true', text: '—□✕' }));
+        : UI.controls());
   }
   function field(label, control) { return h('label', { class: 'field' }, label, control); }
 
