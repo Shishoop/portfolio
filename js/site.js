@@ -89,22 +89,42 @@
     }
     return h('div', { class: 'tools-flow', 'aria-label': 'Tools I use' }, h('div', { class: 'tools-track' }, set(false), set(true)));
   }
-  // The same icons on the cover screen: two scattered lanes that sweep in from the edge and keep drifting behind the logo.
+  // Cover icons: each tool is ONE element, so it can never be on screen twice. Every pass it picks a new
+  // height, size, speed and depth, sometimes crossing in front of the logo and sometimes behind it.
   function heroIcons() {
-    function lane(order, cls) {
-      function set() {
-        return order.map(function (i, n) {
-          var p = SCATTER[(i * 3 + n) % SCATTER.length];
-          return h('img', { src: 'assets/tools/' + TOOLS[i] + '.png', alt: '',
-            style: '--s:' + p[0] + ';--y:' + Math.min(p[1], 0.5) + ';--g:' + (p[2] * 2.2 + 0.5).toFixed(2) + ';--d:' + (n * -0.7).toFixed(1) + 's' });
-        });
-      }
-      return h('div', { class: 'lane ' + cls }, h('div', { class: 'tools-track' }, set(), set()));
+    var back = h('div', { class: 'hero-flow back', 'aria-hidden': 'true' });
+    var front = h('div', { class: 'hero-flow front', 'aria-hidden': 'true' });
+    var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var BANDS = 9, band = Math.floor(Math.random() * BANDS);
+    function rnd(a, b) { return a + Math.random() * (b - a); }
+    function launch(el, progress) {
+      var hero = back.parentNode;
+      if (!hero) return;
+      var W = hero.clientWidth, H = hero.clientHeight;
+      var size = Math.max(34, Math.min(78, W * 0.041)) * rnd(0.6, 1.65);
+      band = (band + 2 + Math.floor(Math.random() * 5)) % BANDS; // never the same height twice in a row
+      var y = (band + rnd(0.05, 0.95)) / BANDS * (H - size * 1.3);
+      (Math.random() < 0.5 ? front : back).appendChild(el);
+      el.style.width = size + 'px';
+      if (still) { el.style.transform = 'translate(' + (progress || 0) * W + 'px,' + y + 'px)'; return; }
+      var spin = rnd(-16, 16);
+      var run = el.animate([
+        { transform: 'translate(' + (W + size) + 'px,' + y + 'px) rotate(' + (-spin) + 'deg)' },
+        { transform: 'translate(' + (-size * 1.6) + 'px,' + (y + rnd(-0.08, 0.08) * H) + 'px) rotate(' + spin + 'deg)' }
+      ], { duration: rnd(18000, 40000), easing: 'linear', fill: 'both' });
+      if (progress) run.currentTime = progress * run.effect.getComputedTiming().duration;
+      run.onfinish = function () { launch(el, 0); };
     }
-    var idx = TOOLS.map(function (t, i) { return i; });
-    return h('div', { class: 'hero-flow', 'aria-hidden': 'true' }, lane(idx, 'l1'), lane(idx.slice().reverse(), 'l2'));
+    var icons = TOOLS.map(function (t) { return h('img', { src: 'assets/tools/' + t + '.png', alt: '' }); });
+    icons.sort(function () { return Math.random() - 0.5; });
+    return {
+      back: back, front: front,
+      start: function () {
+        icons.forEach(function (el, i) { launch(el, (i + rnd(0.1, 0.9)) / icons.length * 0.94); });
+        back.classList.add('go'); front.classList.add('go');
+      }
+    };
   }
-
   function link(label, href) {
     return href ? h('a', { href: href, target: '_blank', rel: 'noopener', text: label }) : h('a', { text: label });
   }
@@ -140,7 +160,7 @@
   function home() {
     var s = C.site;
     var flow = heroIcons();
-    if (sessionStorage.getItem('introSeen')) flow.classList.add('go');
+    var seen = sessionStorage.getItem('introSeen');
     if (!sessionStorage.getItem('introSeen')) {
       var intro = h('div', { class: 'intro', role: 'button', tabindex: '0', 'aria-label': 'Enter site' }, h('span', { text: s.introWord }));
       var leave = function (e) {
@@ -160,7 +180,7 @@
             return;
           }
           intro.classList.add('leave');
-          flow.classList.add('go');
+          flow.start();
           setTimeout(function () { intro.remove(); }, 1200);
         })();
       };
@@ -174,15 +194,16 @@
     tick(); setInterval(tick, 1000);
     app.append(
       h('header', { class: 'hero' },
-        flow,
+        flow.back,
         nav(),
         h('div', { class: 'hero-mid' },
           h('div', { class: 'mark' },
             h('h1', { class: 'sr-only', text: 'Portfolio' }),
             h('img', { src: 'assets/portfolio-wordmark.png', alt: 'Portfolio' }),
             s.roles.map(function (r, i) { return h('span', { class: 'tag t' + (i + 1), text: '( ' + (i + 1) + ' )' + r }); }))),
-        h('div', { class: 'hero-foot' }, clock)),
+        h('div', { class: 'hero-foot' }, clock), flow.front),
       marquee(), aboutBlock(false), footer(), toTop());
+    if (seen) flow.start();
   }
 
   /* ---------- about ---------- */
