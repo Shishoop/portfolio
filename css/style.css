@@ -374,3 +374,11 @@ a:hover .px-arrow, button:hover .px-arrow, a:focus-visible .px-arrow, button:foc
   .tools-track img[aria-hidden] { display: none; }
   .tools-track img { margin-top: 0; }
 }
+/* ===== version 7: intro greetings, cover logo tags placed as in the design ===== */
+.intro span.cycling { animation: none; opacity: 1; letter-spacing: .04em; }
+.mark { font-size: clamp(9px, 1.47vw, 28px); }
+.mark .tag { line-height: 1; }
+.mark .t1 { left: 4.3%; bottom: 97%; }
+.mark .t3 { left: 52.5%; bottom: 97%; }
+.mark .t2 { left: 12%; top: 102%; }
+.mark .t4 { left: 45.8%; top: 102%; }

@@ -120,6 +120,7 @@
   }
 
   /* ---------- home ---------- */
+  var HELLOS = ['Hello', 'Hola', 'Bonjour', 'こんにちは', 'Hallo', '안녕하세요', 'Olá', '你好', 'Kumusta', 'Mabuhay'];
   function home() {
     var s = C.site;
     if (!sessionStorage.getItem('introSeen')) {
@@ -127,9 +128,22 @@
       var leave = function (e) {
         if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
         if (e.clientX) { intro.style.setProperty('--x', e.clientX + 'px'); intro.style.setProperty('--y', e.clientY + 'px'); }
-        intro.classList.add('leave');
+        if (intro.getAttribute('data-go')) return;
+        intro.setAttribute('data-go', '1');
         sessionStorage.setItem('introSeen', '1');
-        setTimeout(function () { intro.remove(); }, 1200);
+        // One click runs through "hello" in other languages, then the site opens.
+        var word = intro.firstChild, n = 0;
+        var hellos = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? [] : HELLOS;
+        word.classList.add('cycling');
+        (function next() {
+          if (n < hellos.length) {
+            word.textContent = hellos[n++];
+            setTimeout(next, n <= 2 ? 300 : n >= hellos.length ? 420 : 170);
+            return;
+          }
+          intro.classList.add('leave');
+          setTimeout(function () { intro.remove(); }, 1200);
+        })();
       };
       intro.addEventListener('click', leave);
       intro.addEventListener('keydown', leave);
