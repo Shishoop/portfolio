@@ -66,8 +66,7 @@
         h('div', { class: 'links' },
           link('Linkedin', s.linkedin), link('Facebook', s.facebook), link('Instagram', s.instagram),
           h('a', { href: 'mailto:' + s.email, text: s.email }),
-          h('div', { class: 'copy', text: s.copyright }),
-          h('a', { class: 'signin', href: 'admin.html', text: 'sign in' }))),
+          h('div', { class: 'copy', text: s.copyright }))),
       h('div', { class: 'bars' }, CATS.map(function (c, i) {
         return h('a', { class: 'b' + (i + 1), href: 'projects.html#' + c, 'aria-label': s.roles[i] + ' projects' });
       })));
