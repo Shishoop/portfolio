@@ -511,7 +511,7 @@
     list.forEach(function (p, n) {
       var col = p.color || SHADES[n % 4], pc = h('span', { class: 'fpages' });
       grid.append(h('button', { onclick: function (e) { popup(p, e.currentTarget, col); } },
-        h('span', { class: 'fwrap fopen', style: 'display:block;' + tint(col) }, folder(col),
+        h('span', { class: 'fwrap fopen' + (tint(col).indexOf('#fff') > 0 ? ' dark' : ''), style: 'display:block;' + tint(col) }, folder(col),
           h('span', { class: 'fpaper' }, pc), h('span', { class: 'ffront' }, h('i'))),
         h('span', { class: 'name', text: p.title })));
       counters.push(function () {
