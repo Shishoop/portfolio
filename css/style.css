@@ -574,3 +574,10 @@ html.locked, html.locked body { overflow: hidden; }
 .shut i { position: absolute; left: 84%; width: 6%; top: 54%; height: 42%; background: #fff; }
 .shut b { position: absolute; left: 100%; top: 0; height: 26%; width: clamp(8px, 1vw, 14px); background: inherit; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 14px), 0 100%); }
 .dossier.twin { position: fixed; z-index: 45; margin: 0; animation: none; pointer-events: none; clip-path: inset(-60px 50% -20px -40px); }
+/* ===== version 25: no side tabs; the title tab sits on the right edge, as it does while the folder turns upright ===== */
+.dossier .stab { display: none; }
+@media (min-width: 761px) {
+  .dossier { margin-top: 0; margin-right: 30px; }
+  .dossier .dtab { left: 100%; top: 0; bottom: auto; width: 30px; height: auto; min-width: 0; max-width: none; min-height: 36%; max-height: 72%; padding: 16px 0 44px; line-height: 30px; writing-mode: vertical-rl; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 30px), 0 100%); }
+  .shut b { width: 30px; height: 40%; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 30px), 0 100%); }
+}
