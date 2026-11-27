@@ -581,3 +581,9 @@ html.locked, html.locked body { overflow: hidden; }
   .dossier .dtab { left: 100%; top: 0; bottom: auto; width: 30px; height: auto; min-width: 0; max-width: none; min-height: 36%; max-height: 72%; padding: 16px 0 44px; line-height: 30px; writing-mode: vertical-rl; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 30px), 0 100%); }
   .shut b { width: 30px; height: 40%; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 30px), 0 100%); }
 }
+/* ===== version 26: the white strip on a folder is a window cut in the front, with the paper showing through ===== */
+.fopen .ffront i { display: none; }
+.fopen .ffront { clip-path: polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, 53.75% 6.6%, 96.25% 6.6%, 96.25% 13.2%, 53.75% 13.2%, 53.75% 6.6%); }
+.fopen .fpaper { left: 4%; right: 2.5%; }
+.fopen .fpages { opacity: 0; transition: opacity .3s var(--ease); }
+.folders button:hover .fpages, .folders button:focus-visible .fpages { opacity: 1; }
