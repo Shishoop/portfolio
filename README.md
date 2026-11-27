@@ -14,3 +14,7 @@ Double-click `start-site.bat`, or run `serve.ps1` in PowerShell, then open http:
 ## Deploy
 
 Vercel serves the files listed in `vercel.json` as they are. Pushing to `main` redeploys.
+
+## Project folders
+
+A Developer project opens as a flat folder with two sheets. Long descriptions are split across sheets automatically (see `paginate` in `js/site.js`), and the arrows turn the page.
