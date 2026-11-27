@@ -89,6 +89,22 @@
     }
     return h('div', { class: 'tools-flow', 'aria-label': 'Tools I use' }, h('div', { class: 'tools-track' }, set(false), set(true)));
   }
+  // The same icons on the cover screen: two scattered lanes that sweep in from the edge and keep drifting behind the logo.
+  function heroIcons() {
+    function lane(order, cls) {
+      function set() {
+        return order.map(function (i, n) {
+          var p = SCATTER[(i * 3 + n) % SCATTER.length];
+          return h('img', { src: 'assets/tools/' + TOOLS[i] + '.png', alt: '',
+            style: '--s:' + p[0] + ';--y:' + Math.min(p[1], 0.5) + ';--g:' + (p[2] * 2.2 + 0.5).toFixed(2) + ';--d:' + (n * -0.7).toFixed(1) + 's' });
+        });
+      }
+      return h('div', { class: 'lane ' + cls }, h('div', { class: 'tools-track' }, set(), set()));
+    }
+    var idx = TOOLS.map(function (t, i) { return i; });
+    return h('div', { class: 'hero-flow', 'aria-hidden': 'true' }, lane(idx, 'l1'), lane(idx.slice().reverse(), 'l2'));
+  }
+
   function link(label, href) {
     return href ? h('a', { href: href, target: '_blank', rel: 'noopener', text: label }) : h('a', { text: label });
   }
@@ -123,6 +139,8 @@
   var HELLOS = ['Hello', 'Hola', 'Bonjour', 'こんにちは', 'Hallo', '안녕하세요', 'Olá', '你好', 'Kumusta', 'Mabuhay'];
   function home() {
     var s = C.site;
+    var flow = heroIcons();
+    if (sessionStorage.getItem('introSeen')) flow.classList.add('go');
     if (!sessionStorage.getItem('introSeen')) {
       var intro = h('div', { class: 'intro', role: 'button', tabindex: '0', 'aria-label': 'Enter site' }, h('span', { text: s.introWord }));
       var leave = function (e) {
@@ -142,6 +160,7 @@
             return;
           }
           intro.classList.add('leave');
+          flow.classList.add('go');
           setTimeout(function () { intro.remove(); }, 1200);
         })();
       };
@@ -155,6 +174,7 @@
     tick(); setInterval(tick, 1000);
     app.append(
       h('header', { class: 'hero' },
+        flow,
         nav(),
         h('div', { class: 'hero-mid' },
           h('div', { class: 'mark' },
@@ -162,7 +182,7 @@
             h('img', { src: 'assets/portfolio-wordmark.png', alt: 'Portfolio' }),
             s.roles.map(function (r, i) { return h('span', { class: 'tag t' + (i + 1), text: '( ' + (i + 1) + ' )' + r }); }))),
         h('div', { class: 'hero-foot' }, clock)),
-      marquee(), aboutBlock(false), tools(), footer(), toTop());
+      marquee(), aboutBlock(false), footer(), toTop());
   }
 
   /* ---------- about ---------- */

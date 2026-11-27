@@ -382,3 +382,22 @@ a:hover .px-arrow, button:hover .px-arrow, a:focus-visible .px-arrow, button:foc
 .mark .t3 { left: 52.5%; bottom: 97%; }
 .mark .t2 { left: 12%; top: 102%; }
 .mark .t4 { left: 45.8%; top: 102%; }
+/* ===== version 8: tool icons flow across the cover screen itself ===== */
+.hero { position: relative; overflow: hidden; }
+.hero > .nav, .hero-mid, .hero-foot { position: relative; z-index: 1; }
+.hero-flow { position: absolute; inset: 0; z-index: 0; pointer-events: none; --base: clamp(34px, 4.1vw, 78px); --h: 26vh;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); }
+.hero-flow .lane { position: absolute; left: 0; height: var(--h); opacity: 0; transform: translateX(75vw); }
+.hero-flow .l1 { top: 11%; }
+.hero-flow .l2 { top: 63%; }
+.hero-flow.go .lane { animation: flow-in 3s var(--ease) both; }
+.hero-flow.go .l2 { animation-delay: .3s; }
+@keyframes flow-in { from { opacity: 0; transform: translateX(75vw); } to { opacity: 1; transform: none; } }
+.hero-flow .l1 .tools-track { animation-duration: 60s; }
+.hero-flow .l2 .tools-track { animation-duration: 80s; }
+@media (prefers-reduced-motion: reduce) {
+  .hero-flow .lane { opacity: 1; transform: none; animation: none !important; }
+  .hero-flow .tools-track { flex-wrap: nowrap; justify-content: flex-start; width: max-content; }
+  .hero-flow .tools-track img[aria-hidden] { display: block; }
+  .hero-flow .tools-track img { margin-top: calc(var(--h) * var(--y)); }
+}
