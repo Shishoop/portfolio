@@ -528,7 +528,7 @@
     return '--fc:' + color + ';--fct:' + (lum > 150 ? '#000' : '#fff');
   }
   // One project opens as a folder lying flat: the inside of the cover on the left, a stack of paper on
-  // the right. Only the top sheet shows. Turning a page lifts that sheet over the top edge, like a page
+  // the right. Only the top sheet shows. Turning a page peels that sheet up to the top-right corner, like a page
   // on a clipboard, then tucks it in at the back of the stack. Nothing scrolls: long writing runs on to
   // the next sheet. Arrows, the mouse wheel, a swipe or the arrow keys turn pages; the X closes.
   function popup(p, opener, color) {
@@ -608,6 +608,8 @@
       update();
     }
     var UP = { duration: 520, easing: 'cubic-bezier(.45, .05, .3, 1)', fill: 'forwards' };
+    // Peeled: the sheet is lifted by its bottom-left corner and swung up past the top-right corner.
+    var REST = 'translate(0%, 0%) rotate3d(1, 1, 0, 0deg)', PEEL = 'translate(5%, -5%) rotate3d(1, 1, 0, 128deg)';
     var TUCK = { duration: 380, easing: 'cubic-bezier(.4, 0, .6, 1)', fill: 'forwards' };
     function turn(dir) {
       var t = s + dir;
@@ -617,15 +619,15 @@
       if (still) { stack.replaceChild(other, old); settle(other, t); return; }
       busy = true;
       if (dir > 0) {
-        // The next sheet is already lying underneath. Lift the top one over the top edge...
+        // The next sheet is already lying underneath. Peel the top one up towards the top-right corner...
         other.style.zIndex = 1;
         stack.insertBefore(other, old);
         old.style.zIndex = 3;
-        old.animate([{ transform: 'rotateX(0deg)' }, { transform: 'rotateX(180deg)' }], UP).onfinish = function () {
-          // ...then slide it down behind the stack.
+        old.animate([{ transform: REST }, { transform: PEEL }], UP).onfinish = function () {
+          // ...then bring it round to the back of the stack.
           old.style.zIndex = 0;
           other.style.zIndex = 2;
-          old.animate([{ transform: 'translateY(0) rotateX(180deg)' }, { transform: 'translateY(100%) rotateX(180deg)' }], TUCK).onfinish = function () {
+          old.animate([{ transform: PEEL }, { transform: REST }], TUCK).onfinish = function () {
             old.remove();
             settle(other, t);
           };
@@ -634,9 +636,9 @@
         // Going back: the previous sheet comes up from behind, then folds down on top.
         other.style.zIndex = 0;
         stack.insertBefore(other, old);
-        other.animate([{ transform: 'translateY(100%) rotateX(180deg)' }, { transform: 'translateY(0) rotateX(180deg)' }], TUCK).onfinish = function () {
+        other.animate([{ transform: REST }, { transform: PEEL }], TUCK).onfinish = function () {
           other.style.zIndex = 3;
-          other.animate([{ transform: 'rotateX(180deg)' }, { transform: 'rotateX(0deg)' }], UP).onfinish = function () {
+          other.animate([{ transform: PEEL }, { transform: REST }], UP).onfinish = function () {
             old.remove();
             other.getAnimations().forEach(function (a) { a.cancel(); });
             settle(other, t);

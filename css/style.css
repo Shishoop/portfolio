@@ -525,3 +525,8 @@ html.locked, html.locked body { overflow: hidden; }
   .pface .sheet.text h3 { font-size: 18px; }
   .pface .sheet.text p { font-size: 14px; }
 }
+/* ===== version 19: the folder opens as two equal halves; sheets peel towards the top-right corner ===== */
+.dossier .open { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.stack { perspective: 2200px; perspective-origin: 100% 0; }
+.paper { transform-origin: 100% 0; }
+@media (max-width: 760px) { .dossier .open { grid-template-columns: minmax(0, 1fr); } }
