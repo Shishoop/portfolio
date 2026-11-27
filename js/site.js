@@ -104,7 +104,7 @@
       var size = Math.max(34, Math.min(78, W * 0.041)) * rnd(0.6, 1.65);
       band = (band + 2 + Math.floor(Math.random() * 5)) % BANDS; // never the same height twice in a row
       var y = (band + rnd(0.05, 0.95)) / BANDS * (H - size * 1.3);
-      (Math.random() < 0.5 ? front : back).appendChild(el);
+      back.appendChild(el); // icons always pass behind the logo and text
       el.style.width = size + 'px';
       if (still) { el.style.transform = 'translate(' + (progress || 0) * W + 'px,' + y + 'px)'; return; }
       var spin = rnd(-16, 16);
