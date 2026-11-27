@@ -300,3 +300,48 @@ a:hover .px-arrow, button:hover .px-arrow, a:focus-visible .px-arrow, button:foc
 @media (prefers-reduced-motion: reduce) {
   .caret, .roles .role { animation: none !important; }
 }
+/* ===== version 4: about shading from the Figma states, folders drop from the line, UI & UX frame 1:1 ===== */
+:root { --shade: #b3b3b3; }
+.about .bio, .about .bio:hover, .about .bio:focus-within { color: #000; }
+.about .more, .about .bio:hover .more, .about .bio:focus-within .more { color: var(--shade); }
+.about .bio.peek, .about .bio.open, .about .bio.open:hover, .about .bio.open:focus-within { color: var(--shade); }
+.about .bio.peek .more, .about .bio.open .more, .about .bio.open:hover .more, .about .bio.open:focus-within .more { color: #000; }
+@media (hover: none) { .about .more { color: var(--shade); } .about .bio.open .more { color: #000; } }
+.about .rule { height: 0; border-top: 2px solid #c6c6c6; margin-top: 8px; transition: border-color .4s var(--ease), border-top-width .3s var(--ease); }
+.about .rule.open { border-top: 4px solid #000; }
+.roles { border-top: 0; margin-top: 0; padding-top: 12px; overflow: hidden; }
+.roles:not([hidden]) .role { animation: drop .8s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes drop { from { transform: translateY(-120%); } to { transform: none; } }
+
+.section { border-bottom: max(3px, calc(100vw / 1920 * 9)) solid #8c8c8c; }
+
+/* every size below is the Figma measurement on the 1920 frame, scaled with the window */
+#uiux { --u: calc(100vw / 1920); padding: calc(88 * var(--u)) calc(30 * var(--u)) calc(77 * var(--u)); }
+#uiux .uxwin .win-bar { min-height: 0; height: calc(92 * var(--u)); font-size: calc(36 * var(--u)); padding: 0; border: 1px solid #000; background: #8c8c8c; }
+#uiux .uxwin .win-bar .ctl { right: calc(29 * var(--u)); gap: calc(24 * var(--u)); }
+#uiux .uxwin .win-bar .ctl svg { width: calc(39 * var(--u)); height: calc(39 * var(--u)); }
+#uiux .uxwin .ux { margin-top: calc(50 * var(--u)); gap: calc(26 * var(--u)); padding: 0; height: calc(767 * var(--u)); grid-template-columns: minmax(0, 1397fr) minmax(0, 437fr); }
+#uiux .uxwin .ux .view { padding: calc(28 * var(--u)); overflow: auto; }
+#uiux .uxwin .ux .view img { width: 100%; margin-bottom: calc(14 * var(--u)); }
+#uiux .uxwin .ux .side { display: flex; gap: calc(25.5 * var(--u)); padding: calc(35 * var(--u)) calc(29.5 * var(--u)) calc(35 * var(--u)) calc(28 * var(--u)); overflow: hidden; }
+#uiux .cells { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; column-gap: calc(9 * var(--u)); row-gap: calc(11 * var(--u)); align-content: start; overflow-y: auto; scrollbar-width: none; }
+#uiux .cells::-webkit-scrollbar { display: none; }
+#uiux .cells button, #uiux .cells .cell { display: block; aspect-ratio: 162 / 90; border: 1px solid #000; overflow: hidden; margin: 0; }
+#uiux .cells button[aria-current] { outline: 2px solid #000; outline-offset: -3px; }
+#uiux .cells img { width: 100%; height: 100%; object-fit: cover; margin: 0; }
+#uiux .sbar { position: relative; flex: 0 0 calc(22 * var(--u)); cursor: pointer; touch-action: none; }
+#uiux .sbar::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: calc(7 * var(--u)); min-width: 3px; transform: translateX(-50%); border: 1px solid #000; background: #fff; }
+#uiux .sthumb { position: absolute; left: 0; width: 100%; top: calc(48 * var(--u)); height: calc(98 * var(--u)); background: #000; }
+
+@media (max-width: 760px) {
+  #uiux { padding: 24px 12px 32px; }
+  #uiux .uxwin .win-bar { height: 40px; font-size: 16px; justify-content: flex-start; padding-left: 12px; }
+  #uiux .uxwin .win-bar .ctl { right: 10px; gap: 9px; }
+  #uiux .uxwin .win-bar .ctl svg { width: 16px; height: 16px; }
+  #uiux .uxwin .ux { margin-top: 12px; gap: 10px; height: auto; grid-template-columns: minmax(0, 1fr); }
+  #uiux .uxwin .ux .view { min-height: 56vw; max-height: 70vh; padding: 10px; }
+  #uiux .uxwin .ux .side { height: 176px; padding: 10px; gap: 10px; max-height: none; }
+  #uiux .cells { grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  #uiux .sbar { flex-basis: 14px; }
+  #uiux .sthumb { top: 12px; height: 44px; }
+}

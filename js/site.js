@@ -58,12 +58,18 @@
       roles.hidden = !roles.hidden;
       more.setAttribute('aria-expanded', String(!roles.hidden));
       bio.classList.toggle('open', !roles.hidden);
+      rule.classList.toggle('open', !roles.hidden);
     } });
     var bio = h('p', { class: 'bio' + (open ? ' open' : '') }, s.bio, more);
+    var rule = h('div', { class: 'rule' + (open ? ' open' : '') });
+    // Only pointing at "what else?" itself swaps the shading.
+    ['mouseenter', 'focus'].forEach(function (ev) { more.addEventListener(ev, function () { bio.classList.add('peek'); }); });
+    ['mouseleave', 'blur'].forEach(function (ev) { more.addEventListener(ev, function () { bio.classList.remove('peek'); }); });
     return h('section', { class: 'about', id: 'about' },
       h('div', null,
         h('h2', { 'aria-label': s.greeting + ' ' + s.greetingLead + ' ' + s.roles.join(', ') }, greeting(s), h('br'), s.greetingLead + ' ', typed(s.roles)),
         bio,
+        rule,
         roles),
       h('div', { class: 'portrait' }, s.portrait ? img(s.portrait, '', 'Portrait') : null));
   }
@@ -194,25 +200,43 @@
   }
 
   function uiux(list, title) {
-    var pane = h('div', { class: 'pane', tabindex: '0' });
-    var side = h('div', { class: 'pane side' }, list.map(function (p, n) {
+    var view = h('div', { class: 'pane view', tabindex: '0' });
+    var cells = h('div', { class: 'cells' }, list.map(function (p, n) {
       return h('button', { 'aria-label': p.title || 'Project ' + (n + 1), onclick: function () { show(n); } }, p.images[0] ? img(p.images[0], '', '') : null);
     }));
+    for (var k = list.length; k < 14; k++) cells.append(h('span', { class: 'cell', 'aria-hidden': 'true' }));
+    var thumb = h('div', { class: 'sthumb' });
+    var sbar = h('div', { class: 'sbar', 'aria-hidden': 'true' }, thumb);
     function show(n) {
       var p = list[n];
-      pane.replaceChildren(h('div', { class: 'caption' }, h('h3', { text: p.title }), h('p', { text: p.description })));
-      p.images.forEach(function (r) { pane.append(img(r, '', p.title)); });
-      if (p.link) pane.append(h('a', { class: 'btn', href: p.link, target: '_blank', rel: 'noopener', text: 'View project' }));
-      pane.scrollTop = 0;
-      Array.prototype.forEach.call(side.children, function (b, n2) { n2 === n ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current'); });
+      view.replaceChildren(h('div', { class: 'caption' }, h('h3', { class: 'swap', text: p.title }), h('p', { class: 'swap', text: p.description })));
+      p.images.forEach(function (r) { view.append(img(r, 'swap', p.title)); });
+      if (p.link) view.append(h('a', { class: 'btn', href: p.link, target: '_blank', rel: 'noopener', text: 'View project' }));
+      view.scrollTop = 0;
+      Array.prototype.forEach.call(cells.children, function (b, n2) { n2 === n ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current'); });
     }
-    for (var k = list.length; k < 18; k++) side.append(h('span', { class: 'cell', 'aria-hidden': 'true' }));
+    // The scrollbar is drawn to match the design and follows the thumbnail list.
+    function sync() {
+      var max = cells.scrollHeight - cells.clientHeight, track = sbar.clientHeight;
+      if (max <= 1) { thumb.style.height = ''; thumb.style.top = ''; return; }
+      var size = Math.max(24, track * cells.clientHeight / cells.scrollHeight);
+      thumb.style.height = size + 'px';
+      thumb.style.top = (cells.scrollTop / max) * (track - size) + 'px';
+    }
+    function jump(e) {
+      var r = sbar.getBoundingClientRect();
+      cells.scrollTop = ((e.clientY - r.top) / r.height) * (cells.scrollHeight - cells.clientHeight);
+    }
+    cells.addEventListener('scroll', sync);
+    window.addEventListener('resize', sync);
+    sbar.addEventListener('pointerdown', function (e) { sbar.setPointerCapture(e.pointerId); jump(e); });
+    sbar.addEventListener('pointermove', function (e) { if (sbar.hasPointerCapture(e.pointerId)) jump(e); });
+    setTimeout(sync, 300);
     if (list.length) show(0);
     return h('div', { class: 'win uxwin' },
       h('div', { class: 'win-bar' }, title, UI.controls()),
-      h('div', { class: 'ux' }, pane, side));
+      h('div', { class: 'ux' }, view, h('div', { class: 'pane side' }, cells, sbar)));
   }
-
   function developer(list) {
     var grid = h('div', { class: 'folders' });
     list.forEach(function (p, n) {
@@ -220,12 +244,12 @@
         h('span', { class: 'fwrap', style: 'display:block' }, folder(SHADES[n % 4], { strip: true })),
         h('span', { class: 'name', text: p.title })));
     });
-    // The empty "+" folders are an admin shortcut: visitors never see them.
-    if (Store.signedIn()) {
-      var slots = Math.max(6, Math.ceil((list.length + 1) / 3) * 3);
-      for (var k = list.length; k < slots; k++) {
-        grid.append(h('a', { href: 'admin.html', 'aria-label': 'Add a project in the admin' }, h('span', { class: 'fwrap', style: 'display:block' }, folder('', { dashed: true, plus: true }))));
-      }
+    // Dotted folders fill the rest of the grid. Only a signed-in admin gets the "+" shortcut.
+    var admin = Store.signedIn();
+    var slots = Math.max(6, Math.ceil((list.length + (admin ? 1 : 0)) / 3) * 3);
+    for (var k = list.length; k < slots; k++) {
+      var empty = h('span', { class: 'fwrap', style: 'display:block' }, folder('', { dashed: true, plus: admin }));
+      grid.append(admin ? h('a', { href: 'admin.html', 'aria-label': 'Add a project in the admin' }, empty) : h('div', { 'aria-hidden': 'true' }, empty));
     }
     return grid;
   }
@@ -278,7 +302,7 @@
       var list = byCat(c);
       var body;
       if (c === 'uiux') body = uiux(list, s.roles[i]);
-      else if (!list.length && !(c === 'developer' && Store.signedIn())) body = h('p', { class: 'empty', text: 'New work coming soon.' });
+      else if (!list.length && c !== 'developer') body = h('p', { class: 'empty', text: 'New work coming soon.' });
       else body = render[c](list);
       app.append(h('section', { class: 'section' + (c === 'developer' ? ' dev' : ''), id: c },
         c === 'uiux' ? h('h2', { class: 'sr-only', text: s.roles[i] }) : h('h2', { text: s.roles[i] }), body));
