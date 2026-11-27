@@ -155,28 +155,33 @@
     return b;
   }
 
-  // Liquid logo: while the pointer is near, the cover logo and its tags are redrawn as thousands of tiny
-  // squares that the pointer pushes and drags like fluid, then they flow back. At rest the real logo shows.
+  // Liquid logo: the cover logo and its tags stay solid, but near the pointer they bend, stretch and wobble
+  // like the surface of a liquid, then settle. The artwork is warped on a fine grid, never broken apart.
   function liquid(hero, mark) {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return { assemble: function () {} };
     var canvas = h('canvas', { class: 'liquid', 'aria-hidden': 'true' });
     var ctx = canvas.getContext('2d');
-    var parts = [], box = null, on = false, raf = 0, dpr = 1, STEP = 2, R = 95;
+    var tex = document.createElement('canvas');
+    var G = 14, MAX = 30, R = 90;
+    var pts = [], cells = [], cols = 0, rows = 0, w = 0, ht = 0, ox = 0, oy = 0, box = null, on = false, raf = 0, dpr = 1;
     var ptr = { x: -9999, y: -9999, vx: 0, vy: 0 };
     hero.appendChild(canvas);
 
-    function build(scatter) {
+    function build() {
       var image = mark.querySelector('img');
       var hr = hero.getBoundingClientRect(), mr = mark.getBoundingClientRect();
       if (!image.naturalWidth || !mr.width) return false;
       dpr = Math.min(2, window.devicePixelRatio || 1);
       canvas.width = Math.round(hr.width * dpr);
       canvas.height = Math.round(hr.height * dpr);
-      var pad = 40, ox = mr.left - hr.left - pad, oy = mr.top - hr.top - pad;
-      var w = Math.ceil(mr.width + pad * 2), ht = Math.ceil(mr.height + pad * 2);
-      var off = document.createElement('canvas');
-      off.width = w; off.height = ht;
-      var c = off.getContext('2d', { willReadFrequently: true });
+      var pad = 42;
+      ox = mr.left - hr.left - pad; oy = mr.top - hr.top - pad;
+      cols = Math.ceil((mr.width + pad * 2) / G); rows = Math.ceil((mr.height + pad * 2) / G);
+      w = cols * G; ht = rows * G;
+      tex.width = Math.round(w * dpr); tex.height = Math.round(ht * dpr);
+      var c = tex.getContext('2d', { willReadFrequently: true });
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      c.clearRect(0, 0, w, ht);
       var ir = image.getBoundingClientRect();
       c.drawImage(image, ir.left - mr.left + pad, ir.top - mr.top + pad, ir.width, ir.height);
       c.fillStyle = '#000';
@@ -186,49 +191,76 @@
         c.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
         c.fillText(t.textContent, r.left - mr.left + pad, r.top - mr.top + pad);
       });
-      var data = c.getImageData(0, 0, w, ht).data;
-      parts = [];
-      for (var y = 0; y < ht; y += STEP) {
-        for (var x = 0; x < w; x += STEP) {
-          if (data[(y * w + x) * 4 + 3] <= 110) continue;
-          var hx = ox + x, hy = oy + y;
-          parts.push({ hx: hx, hy: hy, vx: 0, vy: 0,
-            x: scatter ? hx + (Math.random() - 0.5) * hr.width * 0.55 : hx,
-            y: scatter ? hy + (Math.random() - 0.5) * hr.height * 0.75 : hy });
+      // Only grid squares that actually contain ink need drawing.
+      var data = c.getImageData(0, 0, tex.width, tex.height).data, step = Math.max(1, Math.round(dpr));
+      cells = [];
+      for (var cy = 0; cy < rows; cy++) {
+        for (var cx = 0; cx < cols; cx++) {
+          var ink = false, x0 = Math.floor(cx * G * dpr), y0 = Math.floor(cy * G * dpr), x1 = Math.min(tex.width, Math.ceil((cx + 1) * G * dpr)), y1 = Math.min(tex.height, Math.ceil((cy + 1) * G * dpr));
+          for (var y = y0; y < y1 && !ink; y += step) for (var x = x0; x < x1; x += step) if (data[(y * tex.width + x) * 4 + 3] > 8) { ink = true; break; }
+          if (ink) cells.push(cy * (cols + 1) + cx);
         }
       }
-      R = Math.max(34, Math.min(70, mr.width * 0.1)); // the pointer's reach scales with the logo
+      pts = [];
+      for (var j = 0; j <= rows; j++) for (var i = 0; i <= cols; i++) pts.push({ u: i * G, v: j * G, x: i * G, y: j * G, vx: 0, vy: 0 });
+      R = Math.max(60, Math.min(130, mr.width * 0.17));
       box = { l: ox - R, t: oy - R, r: ox + w + R, b: oy + ht + R };
-      return parts.length > 0;
+      return cells.length > 0;
+    }
+
+    // Draws one triangle of the logo, mapped from its resting shape onto its current warped shape.
+    function tri(a, b, c) {
+      var cxm = (a.x + b.x + c.x) / 3, cym = (a.y + b.y + c.y) / 3, k = 1.06; // slightly oversized so no seams show
+      ctx.setTransform(dpr, 0, 0, dpr, ox * dpr, oy * dpr);
+      ctx.beginPath();
+      ctx.moveTo(cxm + (a.x - cxm) * k, cym + (a.y - cym) * k);
+      ctx.lineTo(cxm + (b.x - cxm) * k, cym + (b.y - cym) * k);
+      ctx.lineTo(cxm + (c.x - cxm) * k, cym + (c.y - cym) * k);
+      ctx.closePath();
+      ctx.save();
+      ctx.clip();
+      var d = (b.u - a.u) * (c.v - a.v) - (c.u - a.u) * (b.v - a.v);
+      var m11 = ((b.x - a.x) * (c.v - a.v) - (c.x - a.x) * (b.v - a.v)) / d;
+      var m21 = ((c.x - a.x) * (b.u - a.u) - (b.x - a.x) * (c.u - a.u)) / d;
+      var m12 = ((b.y - a.y) * (c.v - a.v) - (c.y - a.y) * (b.v - a.v)) / d;
+      var m22 = ((c.y - a.y) * (b.u - a.u) - (b.y - a.y) * (c.u - a.u)) / d;
+      var e = a.x - m11 * a.u - m21 * a.v, f = a.y - m12 * a.u - m22 * a.v;
+      ctx.transform(m11, m12, m21, m22, e, f);
+      ctx.drawImage(tex, 0, 0, w, ht);
+      ctx.restore();
     }
 
     function frame() {
       raf = 0;
-      var px = ptr.x, py = ptr.y, pvx = ptr.vx, pvy = ptr.vy, far = 0, s = STEP + 0.35;
-      ptr.vx *= 0.82; ptr.vy *= 0.82;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-      ctx.fillStyle = '#000';
-      for (var i = 0; i < parts.length; i++) {
-        var p = parts[i], dx = p.x - px, dy = p.y - py, d = dx * dx + dy * dy;
+      var px = ptr.x - ox, py = ptr.y - oy, pvx = ptr.vx, pvy = ptr.vy, far = 0, i;
+      ptr.vx *= 0.8; ptr.vy *= 0.8;
+      for (i = 0; i < pts.length; i++) {
+        var p = pts[i], dx = p.x - px, dy = p.y - py, d = dx * dx + dy * dy;
         if (d < R * R) {
           d = Math.sqrt(d) || 1;
-          var f = 1 - d / R; f *= f;
-          p.vx += dx / d * f * 2.6 + pvx * f * 0.3; // pushed away, and dragged along with the pointer
-          p.vy += dy / d * f * 2.6 + pvy * f * 0.3;
+          var fo = 1 - d / R; fo *= fo;
+          p.vx += pvx * fo * 0.34 + dx / d * fo * 0.9; // carried along by the pointer, with a soft bulge around it
+          p.vy += pvy * fo * 0.34 + dy / d * fo * 0.9;
         }
-        p.vx = (p.vx + (p.hx - p.x) * 0.06) * 0.84;
-        p.vy = (p.vy + (p.hy - p.y) * 0.06) * 0.84;
+        p.vx = (p.vx + (p.u - p.x) * 0.07) * 0.88;
+        p.vy = (p.vy + (p.v - p.y) * 0.07) * 0.88;
         p.x += p.vx; p.y += p.vy;
-        d = Math.abs(p.x - p.hx) + Math.abs(p.y - p.hy);
-        if (d > far) far = d;
-        ctx.fillRect(p.x, p.y, s, s);
+        var ex = p.x - p.u, ey = p.y - p.v, len = Math.sqrt(ex * ex + ey * ey);
+        if (len > MAX) { p.x = p.u + ex / len * MAX; p.y = p.v + ey / len * MAX; }
+        if (len > far) far = len;
       }
-      var near = px > box.l && px < box.r && py > box.t && py < box.b;
-      if (!near && far < 0.5) stop(); else raf = requestAnimationFrame(frame);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (i = 0; i < cells.length; i++) {
+        var n = cells[i], a = pts[n], b = pts[n + 1], c = pts[n + cols + 1], e2 = pts[n + cols + 2];
+        tri(a, b, c);
+        tri(b, e2, c);
+      }
+      var near = ptr.x > box.l && ptr.x < box.r && ptr.y > box.t && ptr.y < box.b;
+      if (!near && far < 0.25) stop(); else raf = requestAnimationFrame(frame);
     }
     function start() {
-      if (!parts.length) return;
+      if (!cells.length) return;
       if (!on) { on = true; mark.classList.add('liquid-on'); canvas.style.opacity = 1; }
       if (!raf) raf = requestAnimationFrame(frame);
     }
@@ -246,8 +278,8 @@
     window.addEventListener('pointermove', function (e) {
       if (!box) return;
       var hr = hero.getBoundingClientRect(), x = e.clientX - hr.left, y = e.clientY - hr.top;
-      ptr.vx = x - ptr.x; ptr.vy = y - ptr.y;
-      ptr.vx = Math.max(-26, Math.min(26, ptr.vx)); ptr.vy = Math.max(-26, Math.min(26, ptr.vy));
+      ptr.vx = Math.max(-28, Math.min(28, x - ptr.x));
+      ptr.vy = Math.max(-28, Math.min(28, y - ptr.y));
       ptr.x = x; ptr.y = y;
       if (x > box.l && x < box.r && y > box.t && y < box.b) start();
     }, { passive: true });
@@ -255,13 +287,24 @@
     var timer;
     window.addEventListener('resize', function () {
       clearTimeout(timer);
-      timer = setTimeout(function () { if (box) build(false); }, 200);
+      timer = setTimeout(function () { if (box) build(); }, 200);
     });
-    ready(function () { if (!box) build(false); });
+    ready(function () { if (!box) build(); });
 
-    return { assemble: function () { ready(function () { if (build(true)) start(); }); } };
+    return {
+      // On arrival the logo ripples once, like a drop landing, then settles.
+      assemble: function () {
+        ready(function () {
+          if (!build()) return;
+          pts.forEach(function (p) {
+            p.x = p.u + Math.sin(p.v * 0.09 + p.u * 0.012) * 8;
+            p.y = p.v + Math.cos(p.u * 0.05) * 5;
+          });
+          start();
+        });
+      }
+    };
   }
-
   /* ---------- home ---------- */
   var HELLOS = ['Hello', 'Hola', 'Bonjour', 'こんにちは', 'Hallo', '안녕하세요', 'Olá', '你好', 'Kumusta', 'Mabuhay'];
   function home() {
