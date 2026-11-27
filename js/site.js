@@ -155,6 +155,113 @@
     return b;
   }
 
+  // Liquid logo: while the pointer is near, the cover logo and its tags are redrawn as thousands of tiny
+  // squares that the pointer pushes and drags like fluid, then they flow back. At rest the real logo shows.
+  function liquid(hero, mark) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return { assemble: function () {} };
+    var canvas = h('canvas', { class: 'liquid', 'aria-hidden': 'true' });
+    var ctx = canvas.getContext('2d');
+    var parts = [], box = null, on = false, raf = 0, dpr = 1, STEP = 2, R = 95;
+    var ptr = { x: -9999, y: -9999, vx: 0, vy: 0 };
+    hero.appendChild(canvas);
+
+    function build(scatter) {
+      var image = mark.querySelector('img');
+      var hr = hero.getBoundingClientRect(), mr = mark.getBoundingClientRect();
+      if (!image.naturalWidth || !mr.width) return false;
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.round(hr.width * dpr);
+      canvas.height = Math.round(hr.height * dpr);
+      var pad = 40, ox = mr.left - hr.left - pad, oy = mr.top - hr.top - pad;
+      var w = Math.ceil(mr.width + pad * 2), ht = Math.ceil(mr.height + pad * 2);
+      var off = document.createElement('canvas');
+      off.width = w; off.height = ht;
+      var c = off.getContext('2d', { willReadFrequently: true });
+      var ir = image.getBoundingClientRect();
+      c.drawImage(image, ir.left - mr.left + pad, ir.top - mr.top + pad, ir.width, ir.height);
+      c.fillStyle = '#000';
+      c.textBaseline = 'top';
+      Array.prototype.forEach.call(mark.querySelectorAll('.tag'), function (t) {
+        var r = t.getBoundingClientRect(), cs = getComputedStyle(t);
+        c.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+        c.fillText(t.textContent, r.left - mr.left + pad, r.top - mr.top + pad);
+      });
+      var data = c.getImageData(0, 0, w, ht).data;
+      parts = [];
+      for (var y = 0; y < ht; y += STEP) {
+        for (var x = 0; x < w; x += STEP) {
+          if (data[(y * w + x) * 4 + 3] <= 110) continue;
+          var hx = ox + x, hy = oy + y;
+          parts.push({ hx: hx, hy: hy, vx: 0, vy: 0,
+            x: scatter ? hx + (Math.random() - 0.5) * hr.width * 0.55 : hx,
+            y: scatter ? hy + (Math.random() - 0.5) * hr.height * 0.75 : hy });
+        }
+      }
+      R = Math.max(34, Math.min(70, mr.width * 0.1)); // the pointer's reach scales with the logo
+      box = { l: ox - R, t: oy - R, r: ox + w + R, b: oy + ht + R };
+      return parts.length > 0;
+    }
+
+    function frame() {
+      raf = 0;
+      var px = ptr.x, py = ptr.y, pvx = ptr.vx, pvy = ptr.vy, far = 0, s = STEP + 0.35;
+      ptr.vx *= 0.82; ptr.vy *= 0.82;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+      ctx.fillStyle = '#000';
+      for (var i = 0; i < parts.length; i++) {
+        var p = parts[i], dx = p.x - px, dy = p.y - py, d = dx * dx + dy * dy;
+        if (d < R * R) {
+          d = Math.sqrt(d) || 1;
+          var f = 1 - d / R; f *= f;
+          p.vx += dx / d * f * 2.6 + pvx * f * 0.3; // pushed away, and dragged along with the pointer
+          p.vy += dy / d * f * 2.6 + pvy * f * 0.3;
+        }
+        p.vx = (p.vx + (p.hx - p.x) * 0.06) * 0.84;
+        p.vy = (p.vy + (p.hy - p.y) * 0.06) * 0.84;
+        p.x += p.vx; p.y += p.vy;
+        d = Math.abs(p.x - p.hx) + Math.abs(p.y - p.hy);
+        if (d > far) far = d;
+        ctx.fillRect(p.x, p.y, s, s);
+      }
+      var near = px > box.l && px < box.r && py > box.t && py < box.b;
+      if (!near && far < 0.5) stop(); else raf = requestAnimationFrame(frame);
+    }
+    function start() {
+      if (!parts.length) return;
+      if (!on) { on = true; mark.classList.add('liquid-on'); canvas.style.opacity = 1; }
+      if (!raf) raf = requestAnimationFrame(frame);
+    }
+    function stop() {
+      on = false;
+      mark.classList.remove('liquid-on');
+      canvas.style.opacity = 0;
+    }
+    function ready(cb) {
+      var image = mark.querySelector('img');
+      var go = function () { (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(cb); };
+      if (image.complete && image.naturalWidth) go(); else image.addEventListener('load', go);
+    }
+
+    window.addEventListener('pointermove', function (e) {
+      if (!box) return;
+      var hr = hero.getBoundingClientRect(), x = e.clientX - hr.left, y = e.clientY - hr.top;
+      ptr.vx = x - ptr.x; ptr.vy = y - ptr.y;
+      ptr.vx = Math.max(-26, Math.min(26, ptr.vx)); ptr.vy = Math.max(-26, Math.min(26, ptr.vy));
+      ptr.x = x; ptr.y = y;
+      if (x > box.l && x < box.r && y > box.t && y < box.b) start();
+    }, { passive: true });
+    document.addEventListener('pointerleave', function () { ptr.x = -9999; ptr.y = -9999; });
+    var timer;
+    window.addEventListener('resize', function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () { if (box) build(false); }, 200);
+    });
+    ready(function () { if (!box) build(false); });
+
+    return { assemble: function () { ready(function () { if (build(true)) start(); }); } };
+  }
+
   /* ---------- home ---------- */
   var HELLOS = ['Hello', 'Hola', 'Bonjour', 'こんにちは', 'Hallo', '안녕하세요', 'Olá', '你好', 'Kumusta', 'Mabuhay'];
   function home() {
@@ -181,6 +288,7 @@
           }
           intro.classList.add('leave');
           flow.start();
+          fluid.assemble();
           setTimeout(function () { intro.remove(); }, 1200);
         })();
       };
@@ -192,8 +300,7 @@
     var clock = h('span');
     var tick = function () { clock.textContent = 'current time: ' + new Date().toLocaleTimeString('en-GB'); };
     tick(); setInterval(tick, 1000);
-    app.append(
-      h('header', { class: 'hero' },
+    var hero = h('header', { class: 'hero' },
         flow.back,
         nav(),
         h('div', { class: 'hero-mid' },
@@ -201,9 +308,10 @@
             h('h1', { class: 'sr-only', text: 'Portfolio' }),
             h('img', { src: 'assets/portfolio-wordmark.png', alt: 'Portfolio' }),
             s.roles.map(function (r, i) { return h('span', { class: 'tag t' + (i + 1), text: '( ' + (i + 1) + ' )' + r }); }))),
-        h('div', { class: 'hero-foot' }, clock), flow.front),
-      marquee(), aboutBlock(false), footer(), toTop());
-    if (seen) flow.start();
+        h('div', { class: 'hero-foot' }, clock), flow.front);
+    app.append(hero, marquee(), aboutBlock(false), footer(), toTop());
+    var fluid = liquid(hero, hero.querySelector('.mark'));
+    if (seen) { flow.start(); fluid.assemble(); }
   }
 
   /* ---------- about ---------- */
@@ -447,7 +555,7 @@
       });
     }, { rootMargin: '0px 0px -6% 0px' });
     var counts = new Map();
-    var pick = '.mark, .hero-foot, .about > *, .tools-flow, .ptitle, .section > h2, .gd > *, .section > div:not(.gd):not(.folders), .folders > *, .chead, .card-wrap, .contact-page > .blurb, .contact-page > .win, .footer .row';
+    var pick = '.hero-foot, .about > *, .tools-flow, .ptitle, .section > h2, .gd > *, .section > div:not(.gd):not(.folders), .folders > *, .chead, .card-wrap, .contact-page > .blurb, .contact-page > .win, .footer .row';
     Array.prototype.forEach.call(document.querySelectorAll(pick), function (el) {
       var n = counts.get(el.parentNode) || 0;
       counts.set(el.parentNode, n + 1);

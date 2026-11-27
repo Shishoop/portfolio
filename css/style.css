@@ -409,3 +409,7 @@ a:hover .px-arrow, button:hover .px-arrow, a:focus-visible .px-arrow, button:foc
 .hero-flow img { position: absolute; left: 0; top: 0; margin: 0; will-change: transform; }
 @keyframes flow-in { from { opacity: 0; transform: translateX(60vw); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .hero-flow, .hero-flow.go { opacity: 1; animation: none !important; transform: none; } }
+/* ===== version 10: liquid logo that the pointer pushes around ===== */
+.liquid { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; opacity: 0; }
+.mark.liquid-on img, .mark.liquid-on .tag { visibility: hidden; }
+.mark .tag { animation: none; }
