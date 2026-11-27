@@ -694,8 +694,16 @@
   }
 
   /* ---------- contact ---------- */
+  // The calling card has two sides. The front is the card itself; "Message me" turns it over to a short
+  // form on the back. Whatever is sent lands in the admin's Messages page.
   function callingCard(s) {
-    var card = h('div', { class: 'ccard' },
+    var note = h('p', { class: 'note', role: 'status' });
+    var name = h('input', { type: 'text', name: 'name', autocomplete: 'name', placeholder: 'Juan dela Cruz' });
+    var email = h('input', { type: 'email', name: 'email', autocomplete: 'email', placeholder: 'name@company.com' });
+    var msg = h('textarea', { name: 'message', placeholder: 'Tell me about your project' });
+    var turnBtn = h('button', { class: 'btn cc-turn', type: 'button', text: 'Message me', onclick: function () { flip(true); } });
+
+    var front = h('div', { class: 'ccard front' },
       h('div', { class: 'cc-logo' }, h('img', { src: 'assets/footer-logo.png', alt: 'narsheessho' })),
       h('div', { class: 'cc-body' },
         h('p', { class: 'cc-name', text: s.cardName }),
@@ -703,54 +711,72 @@
         h('div', { class: 'cc-lines' },
           h('a', { href: 'mailto:' + s.email, text: s.email }),
           h('a', { text: s.handle }),
-          h('span', { class: 'cc-social' }, link('Linkedin', s.linkedin), link('Facebook', s.facebook), link('Instagram', s.instagram)))),
+          h('span', { class: 'cc-social' }, link('Linkedin', s.linkedin), link('Facebook', s.facebook), link('Instagram', s.instagram))),
+        turnBtn),
       h('div', { class: 'cc-bars', 'aria-hidden': 'true' }, [1, 2, 3, 4].map(function (n) { return h('span', { class: 'b' + n }); })));
-    var wrap = h('div', { class: 'card-wrap' }, card);
-    // The card leans toward the pointer, like turning a real card in your hand.
-    if (window.matchMedia('(hover: hover) and (prefers-reduced-motion: no-preference)').matches) {
-      wrap.addEventListener('mousemove', function (e) {
-        var r = wrap.getBoundingClientRect();
-        var x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
-        card.classList.add('tilt');
-        card.style.transform = 'rotateY(' + (x * 12).toFixed(2) + 'deg) rotateX(' + (-y * 12).toFixed(2) + 'deg)';
-      });
-      wrap.addEventListener('mouseleave', function () { card.style.transform = ''; card.classList.remove('tilt'); });
-    }
-    return wrap;
-  }
 
-  function contact() {
-    var s = C.site;
-    var note = h('p', { class: 'note', role: 'status' });
-    var name = h('input', { type: 'text', name: 'name', autocomplete: 'name', placeholder: 'Juan dela Cruz' });
-    var email = h('input', { type: 'email', name: 'email', autocomplete: 'email', placeholder: 'name@company.com' });
-    var msg = h('textarea', { name: 'message', placeholder: 'Tell me about your project' });
-    var form = h('form', { class: 'win', novalidate: true, onsubmit: function (e) {
+    var back = h('form', { class: 'ccard back', novalidate: true, onsubmit: function (e) {
       e.preventDefault();
       note.className = 'note err';
       if (!name.value.trim()) { note.textContent = 'Enter your name.'; name.focus(); return; }
       if (!/^\S+@\S+\.\S+$/.test(email.value.trim())) { note.textContent = 'Enter a valid email.'; email.focus(); return; }
       if (!msg.value.trim()) { note.textContent = 'Write a message first.'; msg.focus(); return; }
       Store.addMessage({ name: name.value.trim(), email: email.value.trim(), message: msg.value.trim() }).then(function () {
-        form.reset();
+        back.reset();
         note.className = 'note';
         note.textContent = 'Message sent. Thank you.';
+        setTimeout(function () { flip(false); note.textContent = ''; }, 1700);
       }, function () {
         note.textContent = "Couldn't send your message. Try again in a moment.";
       });
     } },
-      h('div', { class: 'win-bar' }, 'New message', UI.controls()),
-      h('div', { class: 'form' },
-        h('label', { class: 'field' }, 'Name', name),
-        h('label', { class: 'field' }, 'Email', email),
-        h('label', { class: 'field' }, 'Message', msg),
-        note,
-        h('div', { style: 'text-align:right' }, h('button', { class: 'btn', type: 'submit', text: 'Send' }))));
-    app.append(nav(), h('h1', { class: 'chead', text: s.contactHeading }),
-      h('div', { class: 'contact-page' }, callingCard(s), h('p', { class: 'blurb', text: s.contactBlurb }), form),
-      footer(), toTop());
+      h('div', { class: 'cb-head' }, h('span', { class: 'cb-title', text: s.contactBlurb }), h('img', { src: 'assets/flower.png', alt: '' })),
+      h('div', { class: 'cb-row' }, h('label', { class: 'field' }, 'Name', name), h('label', { class: 'field' }, 'Email', email)),
+      h('label', { class: 'field cb-msg' }, 'Message', msg),
+      h('div', { class: 'cb-foot' }, note,
+        h('button', { class: 'btn ghost', type: 'button', text: 'Back', onclick: function () { flip(false); } }),
+        h('button', { class: 'btn', type: 'submit', text: 'Send' })));
+
+    var flipper = h('div', { class: 'flipper' }, front, back);
+    var wrap = h('div', { class: 'card-wrap' }, h('div', { class: 'floaty' }, flipper));
+    var flipped = false, turning = 0;
+    back.inert = true;
+
+    function flip(to) {
+      flipped = to;
+      turning = Date.now();
+      flipper.style.transition = '';
+      flipper.style.transform = '';
+      flipper.classList.toggle('flipped', flipped);
+      wrap.classList.toggle('is-flipped', flipped);
+      front.inert = flipped;
+      back.inert = !flipped;
+      setTimeout(function () { (flipped ? name : turnBtn).focus({ preventScroll: true }); }, 450);
+    }
+    // The front leans toward the pointer, like turning a real card in your hand. The back stays still for typing.
+    if (window.matchMedia('(hover: hover) and (prefers-reduced-motion: no-preference)').matches) {
+      wrap.addEventListener('mousemove', function (e) {
+        if (flipped || Date.now() - turning < 900) return;
+        var r = wrap.getBoundingClientRect();
+        var x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+        flipper.style.transition = 'transform .12s linear';
+        flipper.style.transform = 'rotateY(' + (x * 12).toFixed(2) + 'deg) rotateX(' + (-y * 12).toFixed(2) + 'deg)';
+      });
+      wrap.addEventListener('mouseleave', function () {
+        if (flipped) return;
+        flipper.style.transition = '';
+        flipper.style.transform = '';
+      });
+    }
+    return wrap;
   }
 
+  function contact() {
+    var s = C.site;
+    app.append(nav(), h('h1', { class: 'chead', text: s.contactHeading }),
+      h('div', { class: 'contact-page' }, callingCard(s)),
+      footer(), toTop());
+  }
   // Elements ease into place as they scroll into view.
   function animate() {
     if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;

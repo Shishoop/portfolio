@@ -480,3 +480,28 @@ html.locked, html.locked body { overflow: hidden; }
 .nav .home.on-dark img { filter: invert(1); }
 .nav .home.on-image img { filter: invert(1) drop-shadow(0 0 5px rgba(0, 0, 0, .7)); }
 #app > .nav + * { margin-top: clamp(56px, 6.4vw, 110px); }
+/* ===== version 17: the calling card turns over to a message form ===== */
+.floaty { perspective: 1600px; animation: float 6s ease-in-out infinite; }
+.card-wrap.is-flipped .floaty { animation-play-state: paused; }
+.flipper { display: grid; aspect-ratio: 1.75; transform-style: preserve-3d; transition: transform .85s cubic-bezier(.3, .1, .2, 1); }
+.flipper.flipped { transform: rotateY(180deg); }
+.flipper .ccard { grid-area: 1 / 1; aspect-ratio: auto; height: 100%; animation: none; transition: none; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.flipper .ccard.back { transform: rotateY(180deg); display: flex; flex-direction: column; gap: clamp(8px, 1.2vw, 14px); grid-template-columns: none; align-items: stretch; }
+.cc-turn { margin-top: clamp(8px, 1.6vw, 18px); padding: 7px 18px; font-size: clamp(11px, 1.2vw, 15px); }
+.cb-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 3px solid #000; padding-bottom: clamp(6px, 1vw, 12px); }
+.cb-title { font-family: var(--font-sans); font-size: clamp(16px, 2.2vw, 26px); line-height: 1.1; }
+.cb-head img { width: clamp(22px, 3vw, 36px); flex: none; }
+.cb-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(8px, 1.4vw, 16px); }
+.ccard.back .field { font-size: 12px; }
+.ccard.back .field input, .ccard.back .field textarea { font-size: 14px; padding: 7px 10px; }
+.cb-msg { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.cb-msg textarea { flex: 1; min-height: 64px; resize: none; }
+.cb-foot { display: flex; align-items: center; gap: 10px; }
+.cb-foot .note { flex: 1; min-height: 0; font-size: 12px; }
+.cb-foot .btn { padding: 7px 18px; font-size: 14px; }
+@media (max-width: 560px) {
+  .flipper { aspect-ratio: auto; }
+  .cb-row { grid-template-columns: minmax(0, 1fr); }
+  .cb-msg textarea { min-height: 90px; }
+}
+@media (prefers-reduced-motion: reduce) { .floaty { animation: none; } .flipper { transition: none; } }
