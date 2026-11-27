@@ -273,6 +273,8 @@
         form.reset();
         note.className = 'note';
         note.textContent = 'Message sent. Thank you.';
+      }, function () {
+        note.textContent = "Couldn't send your message. Try again in a moment.";
       });
     } },
       h('div', { class: 'win-bar' }, 'New message', h('span', { class: 'ctl', 'aria-hidden': 'true', text: '—□✕' })),

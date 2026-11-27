@@ -11,7 +11,13 @@
     clearTimeout(say.t);
     say.t = setTimeout(function () { status.className = 'toast'; }, 2600);
   }
-  function persist(text) { return Store.save(C).then(function () { say(text || 'Saved'); }); }
+  function persist(text) {
+    return Store.save(C).then(function () { say(text || 'Saved'); }, function (e) {
+      if (e && e.status === 401) { say('Your session ended. Sign in again.', true); start(); }
+      else say("Couldn't save. Check your connection and try again.", true);
+      throw e;
+    });
+  }
   function bar(title, onClose) {
     return h('div', { class: 'win-bar' }, title,
       onClose ? h('button', { class: 'ctl', type: 'button', 'aria-label': 'Close', text: '✕', onclick: onClose })
@@ -30,7 +36,7 @@
       if (hasPassword) {
         Store.signIn(pass.value).then(function (ok) {
           if (ok) boot(); else { note.textContent = "That password doesn't match. Try again."; pass.select(); }
-        });
+        }).catch(function () { note.textContent = "Couldn't reach the server. Try again in a moment."; });
         return;
       }
       if (pass.value.length < 8) { note.textContent = 'Use at least 8 characters.'; pass.focus(); return; }
@@ -273,7 +279,7 @@
               h('time', { text: new Date(m.date).toLocaleString() })),
             h('p', { text: m.message }),
             h('button', { type: 'button', class: 'linkish', text: 'Delete', onclick: function () {
-              Store.setMessages(msgs.filter(function (x) { return x.id !== m.id; })).then(draw);
+              Store.deleteMessage(m).then(draw);
             } })));
         });
       });
@@ -295,7 +301,9 @@
     var p1 = h('input', { type: 'password', autocomplete: 'new-password' });
     var p2 = h('input', { type: 'password', autocomplete: 'new-password' });
     return h('div', null, h('h1', { text: 'Backup' }),
-      h('p', { class: 'lead', text: 'Right now your projects, images and texts are saved in this browser on this computer. Download a backup before clearing browser data or switching computers.' }),
+      h('p', { class: 'lead', text: Store.remote()
+        ? 'Your projects, images and texts are saved online, so every visitor sees your changes. A backup file keeps a copy of the texts and project list.'
+        : 'Right now your projects, images and texts are saved in this browser on this computer. Download a backup before clearing browser data or switching computers.' }),
       h('div', { class: 'actions left' },
         h('button', { class: 'btn', type: 'button', text: 'Download backup', onclick: function () {
           Store.exportAll().then(function (data) {
@@ -304,7 +312,8 @@
           });
         } }),
         h('label', { class: 'btn ghost' }, file, 'Restore from backup')),
-      h('h2', { text: 'Change password' }),
+      Store.remote() ? h('h2', { text: 'Password' }) : h('h2', { text: 'Change password' }),
+      Store.remote() ? h('p', { class: 'lead', text: 'The admin password is the ADMIN_PASSWORD setting in your Vercel project. Change it there, then redeploy.' }) :
       h('form', { class: 'form narrow', onsubmit: function (e) {
         e.preventDefault();
         note.textContent = '';

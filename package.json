@@ -5,5 +5,8 @@
   "scripts": {
     "build": "echo \"No build needed for static HTML/CSS site\"",
     "start": "echo \"Open index.html directly or use a local static server\""
+  },
+  "dependencies": {
+    "@vercel/blob": "^1.0.0"
   }
 }

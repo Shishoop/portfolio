@@ -125,7 +125,7 @@
     });
   }
 
-  window.Store = {
+  var Local = {
     SHADES: SHADES,
     CATEGORIES: CATEGORIES,
     uid: uid,
@@ -155,13 +155,15 @@
 
     messages: function () { return kvGet('messages').then(function (m) { return m || []; }); },
     addMessage: function (msg) {
-      return Store.messages().then(function (list) {
+      return Local.messages().then(function (list) {
         msg.id = uid(); msg.date = new Date().toISOString();
         list.unshift(msg);
         return kvSet('messages', list);
       });
     },
-    setMessages: function (list) { return kvSet('messages', list); },
+    deleteMessage: function (m) {
+      return Local.messages().then(function (list) { return kvSet('messages', list.filter(function (x) { return x.id !== m.id; })); });
+    },
 
     hasPassword: function () { return kvGet('auth').then(function (a) { return !!a; }); },
     setPassword: function (password) {
@@ -181,7 +183,7 @@
     signOut: function () { sessionStorage.removeItem('admin'); },
 
     exportAll: function () {
-      return Promise.all([Store.load(), Store.messages(), run('images', 'readonly', function (s) { return s.getAllKeys(); })]).then(function (r) {
+      return Promise.all([Local.load(), Local.messages(), run('images', 'readonly', function (s) { return s.getAllKeys(); })]).then(function (r) {
         var out = { content: r[0], messages: r[1], images: {} };
         return Promise.all(r[2].map(function (key) {
           return run('images', 'readonly', function (s) { return s.get(key); }).then(blobToDataUrl).then(function (d) { out.images[key] = d; });
@@ -198,6 +200,121 @@
       })).then(function () { return kvSet('content', data.content); }).then(function () { return kvSet('messages', data.messages || []); });
     }
   };
+
+  /* ---------- online storage (Vercel) ----------
+     When the site runs on Vercel with storage set up, /api/content answers
+     { configured: true } and everything below is used instead of the browser database,
+     so edits made in the admin are seen by every visitor. */
+  var TOKEN = 'adminToken';
+  var isAdmin = document.body && document.body.getAttribute('data-page') === 'admin';
+  var isRemote = false;
+  var first = null;
+  var mode = fetch('/api/content' + (isAdmin ? '?fresh=' + Date.now() : ''))
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) {
+      isRemote = !!(j && j.configured);
+      first = isRemote ? { content: j.content } : null;
+      return isRemote;
+    })
+    .catch(function () { return false; });
+
+  function token() { return sessionStorage.getItem(TOKEN) || ''; }
+  function tokenValid() { return Number(token().split('.')[0]) > Date.now(); }
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = opts.headers || {};
+    if (token()) opts.headers.Authorization = 'Bearer ' + token();
+    return fetch(path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (r.ok) return data;
+        if (r.status === 401) sessionStorage.removeItem(TOKEN);
+        var err = new Error(data.error || 'Request failed');
+        err.status = r.status;
+        throw err;
+      });
+    });
+  }
+  function withDefaults(c) {
+    var d = defaults();
+    if (!c) return d;
+    for (var k in d.site) if (c.site[k] === undefined) c.site[k] = d.site[k];
+    return c;
+  }
+  function toJpeg(blob) {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      var src = URL.createObjectURL(blob);
+      img.onload = function () {
+        URL.revokeObjectURL(src);
+        var c = document.createElement('canvas');
+        c.width = img.width; c.height = img.height;
+        var g = c.getContext('2d');
+        g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0);
+        c.toBlob(function (b) { resolve(b || blob); }, 'image/jpeg', 0.85);
+      };
+      img.onerror = function () { URL.revokeObjectURL(src); resolve(blob); };
+      img.src = src;
+    });
+  }
+  function uploaded(ref) { return /^https:\/\/[^/]+\.public\.blob\.vercel-storage\.com\/images\//.test(ref || ''); }
+
+  var Remote = {
+    load: function () {
+      if (first) { var c = first.content; first = null; return Promise.resolve(withDefaults(c)); }
+      return api('/api/content?fresh=' + Date.now()).then(function (j) { return withDefaults(j.content); });
+    },
+    save: function (content) {
+      return api('/api/content', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(content) });
+    },
+    putImage: function (file) {
+      return shrink(file)
+        .then(function (blob) { return blob.size > 4000000 ? toJpeg(blob) : blob; })
+        .then(function (blob) { return api('/api/upload', { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob }); })
+        .then(function (j) { return j.url; });
+    },
+    deleteImage: function (ref) {
+      if (!uploaded(ref)) return Promise.resolve();
+      return api('/api/upload?url=' + encodeURIComponent(ref), { method: 'DELETE' }).catch(function () {});
+    },
+    messages: function () { return api('/api/messages').then(function (j) { return j.messages; }); },
+    addMessage: function (msg) {
+      return api('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msg) });
+    },
+    deleteMessage: function (m) { return api('/api/messages?url=' + encodeURIComponent(m.id), { method: 'DELETE' }); },
+    hasPassword: function () { return Promise.resolve(true); },
+    setPassword: function () { return Promise.reject(new Error('The password is set in Vercel')); },
+    signIn: function (password) {
+      return api('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: password }) })
+        .then(function (j) { sessionStorage.setItem(TOKEN, j.token); return true; })
+        .catch(function (e) { if (e.status === 401) return false; throw e; });
+    },
+    exportAll: function () {
+      return Promise.all([Remote.load(), Remote.messages()]).then(function (r) { return { content: r[0], messages: r[1], images: {} }; });
+    },
+    importAll: function (data) {
+      if (!data || !data.content || !data.content.site || !Array.isArray(data.content.projects)) return Promise.reject(new Error('Not a backup file'));
+      return Remote.save(data.content);
+    }
+  };
+
+  var Store = window.Store = {
+    SHADES: SHADES,
+    CATEGORIES: CATEGORIES,
+    uid: uid,
+    url: url,
+    shade: Local.shade,
+    remote: function () { return isRemote; },
+    ready: function () { return mode; },
+    signedIn: function () { return isRemote ? tokenValid() : Local.signedIn(); },
+    signOut: function () { sessionStorage.removeItem(TOKEN); Local.signOut(); }
+  };
+  ['load', 'save', 'putImage', 'deleteImage', 'messages', 'addMessage', 'deleteMessage', 'hasPassword', 'setPassword', 'signIn', 'exportAll', 'importAll'].forEach(function (name) {
+    Store[name] = function () {
+      var args = arguments;
+      return mode.then(function (remote) { return (remote ? Remote : Local)[name].apply(null, args); });
+    };
+  });
 
   /* Small DOM helpers shared by the site and the admin. */
   function h(tag, attrs) {
