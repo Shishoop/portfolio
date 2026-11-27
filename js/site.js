@@ -607,17 +607,18 @@
       cur.style.zIndex = 2;
       update();
     }
-    var TUCK = { duration: 320, easing: 'cubic-bezier(.4, 0, .6, 1)', fill: 'forwards' };
-    var AWAY = 'translate(55%, -55%) rotate(10deg)', REST = 'translate(0%, 0%) rotate(0deg)';
     // The curl: the sheet is picked up by its bottom-left corner and rolled over towards the top-right.
     // A fold line sweeps across the sheet; the part behind the line is hidden, and its mirror image is
     // drawn as the underside of the paper rolling over. "from" and "to" are how far the fold has gone (0 to 1).
-    function curl(sheet, from, to, ms, end) {
+    // "under" runs the same roll beneath the stack, which is how a sheet travels round to the back.
+    function curl(sheet, from, to, ms, under, end) {
       var w = sheet.offsetWidth, ht = sheet.offsetHeight, L = Math.sqrt(w * w + ht * ht);
       if (document.hidden || !L) { sheet.style.clipPath = ''; end(); return; }
       var dx = w / L, dy = -ht / L, ang = Math.atan2(dx, -dy) * 180 / Math.PI;
       var flap = h('div', { class: 'flap' }), wrap = h('div', { class: 'curl' }, flap);
-      stack.appendChild(wrap);
+      wrap.style.zIndex = under ? 0 : 4;
+      sheet.style.zIndex = under ? 0 : 3;
+      stack.insertBefore(wrap, sheet.nextSibling);
       function cut(s, far) {
         var pts = [[0, 0], [w, 0], [w, ht], [0, ht]], out = [];
         for (var i = 0; i < 4; i++) {
@@ -641,7 +642,7 @@
       var t0 = performance.now();
       draw(from * L);
       requestAnimationFrame(function frame(now) {
-        var k = Math.min(Math.max((now - t0) / ms, 0), 1), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        var k = Math.min(Math.max((now - t0) / ms, 0), 1), e = from < to ? k * k : 1 - (1 - k) * (1 - k); // speeds up on the way out, slows on the way in, so the two halves join
         draw((from + (to - from) * e) * L);
         if (k < 1) return requestAnimationFrame(frame);
         wrap.remove();
@@ -655,35 +656,28 @@
       var other = sheetOf(t), old = cur;
       if (still) { stack.replaceChild(other, old); settle(other, t); return; }
       busy = true;
+      // One continuous roll: the sheet curls off towards the top-right corner, carries on over the edge,
+      // and the same roll unwinds underneath the stack until the sheet lies flat at the back.
       if (dir > 0) {
-        // The next sheet is already lying underneath. Curl the top one away to the top right...
-        other.style.zIndex = 1;
+        other.style.zIndex = 2;
         stack.insertBefore(other, old);
-        old.style.zIndex = 3;
-        curl(old, 0, 1.02, 760, function () {
-          // ...then it comes round and slips in at the back of the stack.
-          old.style.zIndex = 0;
-          other.style.zIndex = 2;
-          old.style.clipPath = '';
-          old.animate([{ transform: AWAY }, { transform: REST }], TUCK).onfinish = function () {
+        curl(old, 0, 1.02, 600, false, function () {
+          curl(old, 1.02, 0, 520, true, function () {
             old.remove();
             settle(other, t);
-          };
+          });
         });
       } else {
-        // Going back: the previous sheet slips out from behind, then uncurls on top.
-        other.style.zIndex = 0;
+        // Going back is the same roll the other way: out from the back, over the corner, down on top.
         stack.insertBefore(other, old);
-        other.animate([{ transform: REST }, { transform: AWAY }], TUCK).onfinish = function () {
-          other.getAnimations().forEach(function (a) { a.cancel(); });
-          other.style.clipPath = 'polygon(0 0, 0 0, 0 0)';
-          other.style.zIndex = 3;
-          curl(other, 1.02, 0, 760, function () {
+        old.style.zIndex = 2;
+        curl(other, 0, 1.02, 520, true, function () {
+          curl(other, 1.02, 0, 600, false, function () {
             other.style.clipPath = '';
             old.remove();
             settle(other, t);
           });
-        };
+        });
       }
     }    // Scrolling never moves anything: one wheel gesture or swipe is one page.
     function wheel(e) {
