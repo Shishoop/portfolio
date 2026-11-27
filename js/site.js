@@ -467,21 +467,23 @@
     return grid;
   }
 
-  // One project opens as a folder lying flat, a sheet of paper on each side. The arrows turn its pages.
-  // Long writing is never scrolled: it runs on to the next sheet, like the pages of a thesis.
-  // The X is the only way out, so each folder is looked at on its own before opening another.
+  // One project opens as a folder lying flat, a sheet of paper on each side (one sheet on a phone).
+  // Nothing inside it scrolls: long writing runs on to the next sheet like a thesis, and the arrows,
+  // the mouse wheel, a swipe or the arrow keys all turn the page. The X is the only way out.
   function popup(p, opener) {
-    var flat = window.matchMedia('(max-width: 760px), (prefers-reduced-motion: reduce)').matches;
     var narrow = window.matchMedia('(max-width: 760px)').matches;
+    var flat = narrow || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var per = narrow ? 1 : 2; // sheets visible at once
     var left = h('div', { class: 'page left' }), right = h('div', { class: 'page right' });
-    var book = h('div', { class: 'book' + (narrow ? ' stacked' : '') }, left, right);
+    var book = h('div', { class: 'book' + (narrow ? ' single' : '') }, left, right);
     var count = h('div', { class: 'count', 'aria-live': 'polite' });
     var prev = h('button', { class: 'chev', 'aria-label': 'Previous page', onclick: function () { turn(-1); } }, UI.arrow('left'));
     var next = h('button', { class: 'chev', 'aria-label': 'Next page', onclick: function () { turn(1); } }, UI.arrow('right'));
     var close = h('button', { class: 'x', 'aria-label': 'Close', text: '✕', onclick: done });
     var overlay = h('div', { class: 'overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': p.title || 'Project' },
       prev, h('div', { class: 'dossier' }, h('div', { class: 'dtab', text: p.title }), close, book, count), next);
-    var pages = [], spreads = 1, s = 0, busy = false;
+    var pages = [], spreads = 1, s = 0, busy = false, last = 0;
+    var blank = function () { return h('div', { class: 'sheet blank' }); };
 
     function pic(ref) { return function () { return h('div', { class: 'sheet pic' }, ref ? img(ref, '', p.title) : null); }; }
     function paper(d) {
@@ -491,19 +493,17 @@
           d.head && p.role ? h('p', { class: 'role-line', text: p.role }) : null,
           d.text ? h('p', { class: 'body', text: d.text }) : null,
           d.link ? h('a', { class: 'go', href: p.link, target: '_blank', rel: 'noopener', text: 'View project' }) : null,
-          narrow ? null : h('span', { class: 'pnum', text: String(d.n) }));
+          h('span', { class: 'pnum', text: String(d.n) }));
       };
     }
     // Fills one sheet with as many words as fit, then carries the rest over to the next sheet.
     function paginate() {
-      var text = p.description || '';
-      if (narrow) return [{ head: true, text: text, link: !!p.link, n: 1 }];
       var probe = h('div', { class: 'page probe' });
       book.appendChild(probe);
       var cs = getComputedStyle(probe), room = probe.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
       function fits(d) { var sh = paper(d)(); sh.style.height = 'auto'; probe.replaceChildren(sh); return sh.offsetHeight <= room; }
-      var tokens = text.split(/(\s+)/), out = [], i = 0, head = true;
-      while (out.length < 80) {
+      var tokens = (p.description || '').split(/(\s+)/), out = [], i = 0, head = true;
+      while (out.length < 120) {
         var n = tokens.length - i, d = { head: head, link: false, n: out.length + 1 };
         d.text = tokens.slice(i, i + n).join('').trim();
         if (!d.text && !head) break;
@@ -522,14 +522,18 @@
         if (i >= tokens.length) break;
       }
       if (p.link) {
-        var last = out[out.length - 1];
-        last.link = true;
-        if (!fits(last)) { last.link = false; out.push({ head: false, text: '', link: true, n: out.length + 1 }); }
+        var tail = out[out.length - 1];
+        tail.link = true;
+        if (!fits(tail)) { tail.link = false; out.push({ head: false, text: '', link: true, n: out.length + 1 }); }
       }
       probe.remove();
       return out;
     }
 
+    function show() {
+      left.replaceChildren(pages[s * per]());
+      if (per === 2) right.replaceChildren(pages[s * per + 1]());
+    }
     function update() {
       count.textContent = spreads > 1 ? (s + 1) + ' / ' + spreads : '';
       prev.style.visibility = s > 0 ? '' : 'hidden';
@@ -539,7 +543,12 @@
     function turn(dir) {
       var t = s + dir;
       if (busy || t < 0 || t >= spreads) return;
-      if (flat) { s = t; left.replaceChildren(pages[2 * s]()); right.replaceChildren(pages[2 * s + 1]()); update(); return; }
+      last = Date.now();
+      if (flat) {
+        s = t; show(); update();
+        left.firstChild.classList.add(dir > 0 ? 'slide-next' : 'slide-prev');
+        return;
+      }
       busy = true;
       var fwd = dir > 0;
       var leaf = h('div', { class: 'leaf ' + (fwd ? 'next' : 'prev') },
@@ -551,31 +560,52 @@
         { duration: 900, easing: 'cubic-bezier(.45, .05, .2, 1)', fill: 'forwards' }).onfinish = function () {
         (fwd ? left : right).replaceChildren(pages[fwd ? 2 * t : 2 * t + 1]());
         leaf.remove();
-        s = t; busy = false; update();
+        s = t; busy = false; last = Date.now(); update();
       };
     }
+    // Scrolling never moves anything: one wheel gesture or swipe is one page.
+    function wheel(e) {
+      e.preventDefault();
+      if (Math.abs(e.deltaY) < 6 || Date.now() - last < 420) return;
+      turn(e.deltaY > 0 ? 1 : -1);
+    }
+    var touch = null;
+    function touchStart(e) { touch = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
+    function touchMove(e) { if (e.cancelable) e.preventDefault(); }
+    function touchEnd(e) {
+      if (!touch) return;
+      var dx = e.changedTouches[0].clientX - touch.x, dy = e.changedTouches[0].clientY - touch.y;
+      touch = null;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 40) return;
+      turn((Math.abs(dx) > Math.abs(dy) ? dx : dy) < 0 ? 1 : -1);
+    }
     function key(e) {
-      if (e.key === 'Escape') done();
-      if (e.key === 'ArrowLeft') turn(-1);
-      if (e.key === 'ArrowRight') turn(1);
+      if (e.key === 'Escape') return done();
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); turn(1); }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); turn(-1); }
     }
     function done() {
       document.removeEventListener('keydown', key);
+      document.documentElement.classList.remove('locked');
       overlay.classList.add('out');
       setTimeout(function () { overlay.remove(); }, 220);
       if (opener) opener.focus();
     }
 
     document.addEventListener('keydown', key);
+    overlay.addEventListener('wheel', wheel, { passive: false });
+    book.addEventListener('touchstart', touchStart, { passive: true });
+    book.addEventListener('touchmove', touchMove, { passive: false });
+    book.addEventListener('touchend', touchEnd);
+    document.documentElement.classList.add('locked'); // the page behind stays still while a folder is open
     document.body.appendChild(overlay);
     // Order: first image, then the writing on as many sheets as it needs, then the remaining images.
     pages = [pic(p.images[0] || '')];
     paginate().forEach(function (d) { pages.push(paper(d)); });
     p.images.slice(1).forEach(function (r) { pages.push(pic(r)); });
-    if (pages.length % 2) pages.push(function () { return h('div', { class: 'sheet blank' }); });
-    spreads = pages.length / 2;
-    left.replaceChildren(pages[0]());
-    right.replaceChildren(pages[1]());
+    while (pages.length % per) pages.push(blank);
+    spreads = pages.length / per;
+    show();
     update();
     close.focus();
   }

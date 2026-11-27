@@ -451,3 +451,20 @@ a:hover .px-arrow, button:hover .px-arrow, a:focus-visible .px-arrow, button:foc
 .sheet.text .role-line { flex: none; margin: -8px 0 0; color: var(--mute); font-size: clamp(11px, .9vw, 16px); }
 .sheet.text .pnum { margin-top: auto; text-align: center; color: var(--mute); font-size: 12px; line-height: 1; }
 .sheet.text .go { margin-top: 6px; }
+/* ===== version 14: nothing in an open folder scrolls; the wheel, a swipe or the keys turn the page ===== */
+html.locked, html.locked body { overflow: hidden; }
+.overlay { overscroll-behavior: contain; }
+.book .page, .book .face { overflow: hidden; }
+.sheet.slide-next { animation: slide-next .45s var(--ease) both; }
+.sheet.slide-prev { animation: slide-prev .45s var(--ease) both; }
+@keyframes slide-next { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: none; } }
+@keyframes slide-prev { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
+@media (max-width: 760px) {
+  .book.single { grid-template-columns: minmax(0, 1fr); height: min(66vh, 560px); max-height: none; overflow: hidden; }
+  .book.single .page.right { display: none; }
+  .book.single .page.left { border: 0; box-shadow: none; min-height: 0; height: 100%; padding: 16px; }
+  .book.single .page.probe { width: 100%; padding: 16px; }
+  .book.single .sheet.text h3 { font-size: 18px; }
+  .book.single .sheet.text p { font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .sheet.slide-next, .sheet.slide-prev { animation: none; } }
