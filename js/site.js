@@ -607,10 +607,47 @@
       cur.style.zIndex = 2;
       update();
     }
-    var UP = { duration: 520, easing: 'cubic-bezier(.45, .05, .3, 1)', fill: 'forwards' };
-    // Peeled: the sheet is lifted by its bottom-left corner and swung up past the top-right corner.
-    var REST = 'translate(0%, 0%) rotate3d(1, 1, 0, 0deg)', PEEL = 'translate(5%, -5%) rotate3d(1, 1, 0, 128deg)';
-    var TUCK = { duration: 380, easing: 'cubic-bezier(.4, 0, .6, 1)', fill: 'forwards' };
+    var TUCK = { duration: 320, easing: 'cubic-bezier(.4, 0, .6, 1)', fill: 'forwards' };
+    var AWAY = 'translate(55%, -55%) rotate(10deg)', REST = 'translate(0%, 0%) rotate(0deg)';
+    // The curl: the sheet is picked up by its bottom-left corner and rolled over towards the top-right.
+    // A fold line sweeps across the sheet; the part behind the line is hidden, and its mirror image is
+    // drawn as the underside of the paper rolling over. "from" and "to" are how far the fold has gone (0 to 1).
+    function curl(sheet, from, to, ms, end) {
+      var w = sheet.offsetWidth, ht = sheet.offsetHeight, L = Math.sqrt(w * w + ht * ht);
+      if (document.hidden || !L) { sheet.style.clipPath = ''; end(); return; }
+      var dx = w / L, dy = -ht / L, ang = Math.atan2(dx, -dy) * 180 / Math.PI;
+      var flap = h('div', { class: 'flap' }), wrap = h('div', { class: 'curl' }, flap);
+      stack.appendChild(wrap);
+      function cut(s, far) {
+        var pts = [[0, 0], [w, 0], [w, ht], [0, ht]], out = [];
+        for (var i = 0; i < 4; i++) {
+          var a = pts[i], b = pts[(i + 1) % 4];
+          var fa = a[0] * dx + (a[1] - ht) * dy - s, fb = b[0] * dx + (b[1] - ht) * dy - s;
+          var ia = far ? fa >= 0 : fa <= 0, ib = far ? fb >= 0 : fb <= 0;
+          if (ia) out.push(a);
+          if (ia !== ib) { var k = fa / (fa - fb); out.push([a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]); }
+        }
+        if (out.length < 3) return 'polygon(0 0, 0 0, 0 0)';
+        return 'polygon(' + out.map(function (p) { return p[0].toFixed(1) + 'px ' + p[1].toFixed(1) + 'px'; }).join(',') + ')';
+      }
+      function draw(s) {
+        var m = 2 * (s + ht * dy);
+        sheet.style.clipPath = cut(s, true);
+        flap.style.clipPath = cut(s, false);
+        flap.style.transform = 'matrix(' + [1 - 2 * dx * dx, -2 * dx * dy, -2 * dx * dy, 1 - 2 * dy * dy, m * dx, m * dy].map(function (n) { return n.toFixed(4); }).join(',') + ')';
+        // Shading that follows the fold, so the underside reads as rounded rather than creased.
+        flap.style.background = 'linear-gradient(' + ang.toFixed(2) + 'deg, #f1f1f1 0px, #f1f1f1 ' + Math.max(s - 150, 0).toFixed(1) + 'px, #ffffff ' + Math.max(s - 55, 0).toFixed(1) + 'px, #dedede ' + Math.max(s - 16, 0).toFixed(1) + 'px, #b9b9b9 ' + s.toFixed(1) + 'px)';
+      }
+      var t0 = performance.now();
+      draw(from * L);
+      requestAnimationFrame(function frame(now) {
+        var k = Math.min(Math.max((now - t0) / ms, 0), 1), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        draw((from + (to - from) * e) * L);
+        if (k < 1) return requestAnimationFrame(frame);
+        wrap.remove();
+        end();
+      });
+    }
     function turn(dir) {
       var t = s + dir;
       if (busy || t < 0 || t >= pages.length) return;
@@ -619,34 +656,36 @@
       if (still) { stack.replaceChild(other, old); settle(other, t); return; }
       busy = true;
       if (dir > 0) {
-        // The next sheet is already lying underneath. Peel the top one up towards the top-right corner...
+        // The next sheet is already lying underneath. Curl the top one away to the top right...
         other.style.zIndex = 1;
         stack.insertBefore(other, old);
         old.style.zIndex = 3;
-        old.animate([{ transform: REST }, { transform: PEEL }], UP).onfinish = function () {
-          // ...then bring it round to the back of the stack.
+        curl(old, 0, 1.02, 760, function () {
+          // ...then it comes round and slips in at the back of the stack.
           old.style.zIndex = 0;
           other.style.zIndex = 2;
-          old.animate([{ transform: PEEL }, { transform: REST }], TUCK).onfinish = function () {
+          old.style.clipPath = '';
+          old.animate([{ transform: AWAY }, { transform: REST }], TUCK).onfinish = function () {
             old.remove();
             settle(other, t);
           };
-        };
+        });
       } else {
-        // Going back: the previous sheet comes up from behind, then folds down on top.
+        // Going back: the previous sheet slips out from behind, then uncurls on top.
         other.style.zIndex = 0;
         stack.insertBefore(other, old);
-        other.animate([{ transform: REST }, { transform: PEEL }], TUCK).onfinish = function () {
+        other.animate([{ transform: REST }, { transform: AWAY }], TUCK).onfinish = function () {
+          other.getAnimations().forEach(function (a) { a.cancel(); });
+          other.style.clipPath = 'polygon(0 0, 0 0, 0 0)';
           other.style.zIndex = 3;
-          other.animate([{ transform: PEEL }, { transform: REST }], UP).onfinish = function () {
+          curl(other, 1.02, 0, 760, function () {
+            other.style.clipPath = '';
             old.remove();
-            other.getAnimations().forEach(function (a) { a.cancel(); });
             settle(other, t);
-          };
+          });
         };
       }
-    }
-    // Scrolling never moves anything: one wheel gesture or swipe is one page.
+    }    // Scrolling never moves anything: one wheel gesture or swipe is one page.
     function wheel(e) {
       e.preventDefault();
       if (Math.abs(e.deltaY) < 6 || Date.now() - last < 420) return;
