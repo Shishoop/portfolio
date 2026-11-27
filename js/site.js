@@ -6,13 +6,66 @@
   var page = document.body.getAttribute('data-page');
   var C;
 
+  // The nav floats over the page with no background. Each item looks at what is directly behind it
+  // and switches between black and white, so it stays readable over folders, bars and the marquee.
+  function contrastNav(el) {
+    var items = el.querySelectorAll('a'), queued = false;
+    function rgb(str) {
+      var m = /rgba?\(([^)]+)\)/.exec(str || '');
+      if (!m) return null;
+      var p = m[1].split(/[,\s\/]+/).map(parseFloat);
+      return p.length > 3 && p[3] < 0.5 ? null : p;
+    }
+    function behind(x, y) {
+      var stack = document.elementsFromPoint(x, y);
+      for (var i = 0; i < stack.length; i++) {
+        var n = stack[i];
+        if (el.contains(n)) continue;
+        var tag = n.tagName.toLowerCase();
+        if (tag === 'img' || tag === 'video' || tag === 'canvas' || tag === 'iframe') return 'image';
+        var cs = getComputedStyle(n);
+        if (n instanceof SVGElement) {
+          var fill = tag === 'svg' ? null : rgb(cs.fill);
+          if (fill) return fill;
+          continue;
+        }
+        var bg = rgb(cs.backgroundColor);
+        if (bg) return bg;
+      }
+      return [255, 255, 255];
+    }
+    function update() {
+      queued = false;
+      Array.prototype.forEach.call(items, function (a) {
+        var r = a.getBoundingClientRect();
+        if (!r.width) return;
+        // Three points across the item, so one that straddles an edge follows the larger part.
+        var image = 0, lum = 0, y = r.top + r.height / 2;
+        [0.2, 0.5, 0.8].forEach(function (k) {
+          var c = behind(r.left + r.width * k, y);
+          if (c === 'image') { image++; return; }
+          lum += (c[0] * 299 + c[1] * 587 + c[2] * 114) / 1000;
+        });
+        a.classList.toggle('on-image', image >= 2);
+        a.classList.toggle('on-dark', image >= 2 || lum / Math.max(1, 3 - image) < 150);
+      });
+    }
+    function queue() { if (!queued) { queued = true; requestAnimationFrame(update); } }
+    window.addEventListener('scroll', queue, { passive: true });
+    window.addEventListener('resize', queue);
+    setInterval(update, 700); // also catches things that move under it without scrolling
+    setTimeout(update, 200);
+  }
+
   function nav() {
     var items = [['about', 'about.html'], ['projects', 'projects.html'], ['contact', 'contact.html']];
-    return h('nav', { class: 'nav', 'aria-label': 'Main' },
+    var el = h('nav', { class: 'nav', 'aria-label': 'Main' },
       page === 'home' ? h('span') : h('a', { class: 'home', href: 'index.html', 'aria-label': 'Home' }, h('img', { src: 'assets/flower.png', alt: '' })),
       h('ul', null, items.map(function (i) {
         return h('li', null, h('a', { href: i[1], 'aria-current': page === i[0] ? 'page' : null, text: i[0] }));
       })));
+    contrastNav(el);
+    return el;
   }
 
   function marquee() {

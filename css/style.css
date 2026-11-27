@@ -471,3 +471,12 @@ html.locked, html.locked body { overflow: hidden; }
 /* ===== version 15: an open folder takes its project's colour ===== */
 .dossier, .dossier .dtab { background: var(--fc, var(--line)); }
 .dossier .dtab, .dossier .x, .dossier .count { color: var(--fct, #fff); }
+/* ===== version 16: sticky, see-through nav; each item turns black or white to suit what is behind it ===== */
+.nav, .hero > .nav, .phero > .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 30; background: none; pointer-events: none; }
+.nav a, .nav .home { pointer-events: auto; color: #000; transition: color .25s ease; }
+.nav a.on-dark { color: #fff; }
+.nav a.on-image { text-shadow: 0 0 8px rgba(0, 0, 0, .75); }
+.nav .home img { transition: filter .25s ease; }
+.nav .home.on-dark img { filter: invert(1); }
+.nav .home.on-image img { filter: invert(1) drop-shadow(0 0 5px rgba(0, 0, 0, .7)); }
+#app > .nav + * { margin-top: clamp(56px, 6.4vw, 110px); }
