@@ -533,3 +533,18 @@ html.locked, html.locked body { overflow: hidden; }
 /* ===== version 20: pages curl away from the bottom-left corner ===== */
 .curl { position: absolute; inset: 0 10px 10px 0; z-index: 4; pointer-events: none; filter: drop-shadow(-4px 8px 10px rgba(0, 0, 0, .3)); }
 .flap { position: absolute; inset: 0; transform-origin: 0 0; background: #f1f1f1; }
+/* ===== version 21: the folder opens as a two-page spread; the right sheet curls over onto the left ===== */
+.spread { position: relative; height: min(66vh, 580px); }
+.spread::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(0, 0, 0, .22); z-index: 3; pointer-events: none; }
+.leaf { position: absolute; top: 0; bottom: 0; left: 0; width: 50%; }
+.leaf.right { left: 50%; }
+.leaf.probe { visibility: hidden; pointer-events: none; }
+.leaf.left .pface { background: linear-gradient(to right, #fff 86%, #ebebeb); }
+.leaf.right .pface { background: linear-gradient(to left, #fff 86%, #ebebeb); }
+.curlw { position: absolute; inset: 0; z-index: 4; pointer-events: none; filter: drop-shadow(0 8px 12px rgba(0, 0, 0, .32)); }
+.curlw .leaf { transform-origin: 0 0; }
+.curlw .shade { position: absolute; inset: 0; }
+.spread.single::after { display: none; }
+.spread.single .leaf.right { left: 0; width: 100%; }
+.spread.single .leaf.right .pface { background: #fff; }
+@media (max-width: 760px) { .spread { height: min(66vh, 560px); } }

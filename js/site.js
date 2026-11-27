@@ -527,26 +527,22 @@
     var lum = (parseInt(m[1], 16) * 299 + parseInt(m[2], 16) * 587 + parseInt(m[3], 16) * 114) / 1000;
     return '--fc:' + color + ';--fct:' + (lum > 150 ? '#000' : '#fff');
   }
-  // One project opens as a folder lying flat: the inside of the cover on the left, a stack of paper on
-  // the right. Only the top sheet shows. Turning a page peels that sheet up to the top-right corner, like a page
-  // on a clipboard, then tucks it in at the back of the stack. Nothing scrolls: long writing runs on to
-  // the next sheet. Arrows, the mouse wheel, a swipe or the arrow keys turn pages; the X closes.
+  // One project opens as a folder lying flat with a sheet on each side, like an open book. Turning the
+  // page curls the right-hand sheet over by its bottom corner and lays it down on the left. Nothing
+  // scrolls: long writing runs on to the next sheet. Arrows, the mouse wheel, a swipe or the arrow keys
+  // turn pages; the X closes.
   function popup(p, opener, color) {
     var narrow = window.matchMedia('(max-width: 760px)').matches;
     var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var stack = h('div', { class: 'stack' });
+    var per = narrow ? 1 : 2; // phones show one sheet at a time
+    var spread = h('div', { class: 'spread' + (narrow ? ' single' : '') });
     var count = h('div', { class: 'count', 'aria-live': 'polite' });
     var prev = h('button', { class: 'chev', 'aria-label': 'Previous page', onclick: function () { turn(-1); } }, UI.arrow('left'));
     var next = h('button', { class: 'chev', 'aria-label': 'Next page', onclick: function () { turn(1); } }, UI.arrow('right'));
     var close = h('button', { class: 'x', 'aria-label': 'Close', text: '✕', onclick: done });
-    var cover = h('div', { class: 'cover' },
-      h('h3', { text: p.title }),
-      p.role ? h('p', { class: 'cover-role', text: p.role }) : null,
-      h('p', { class: 'cover-hint', text: 'Scroll or use the arrows to turn the page' }));
     var overlay = h('div', { class: 'overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': p.title || 'Project' },
-      prev, h('div', { class: 'dossier', style: tint(color) }, h('div', { class: 'dtab', text: p.title }), close,
-        h('div', { class: 'open' }, cover, stack), count), next);
-    var pages = [], s = 0, busy = false, last = 0, cur = null;
+      prev, h('div', { class: 'dossier', style: tint(color) }, h('div', { class: 'dtab', text: p.title }), close, spread, count), next);
+    var pages = [], s = 0, busy = false, last = 0, L = null, R = null;
 
     function pic(ref) { return function () { return h('div', { class: 'sheet pic' }, img(ref, '', p.title)); }; }
     function paper(d) {
@@ -559,13 +555,13 @@
           h('span', { class: 'pnum', text: String(d.n) }));
       };
     }
-    function sheetOf(i) {
-      return h('div', { class: 'paper' }, h('div', { class: 'pface front' }, pages[i]()), h('div', { class: 'pface back' }));
+    function leaf(i, side) {
+      return h('div', { class: 'leaf ' + side }, h('div', { class: 'pface' }, i >= 0 && i < pages.length ? pages[i]() : null));
     }
     // Fills one sheet with as many words as fit, then carries the rest over to the next sheet.
     function paginate() {
-      var probe = h('div', { class: 'paper probe' }, h('div', { class: 'pface front' }));
-      stack.appendChild(probe);
+      var probe = h('div', { class: 'leaf right probe' }, h('div', { class: 'pface' }));
+      spread.appendChild(probe);
       var face = probe.firstChild, cs = getComputedStyle(face);
       var room = face.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
       function fits(d) { var sh = paper(d)(); sh.style.height = 'auto'; face.replaceChildren(sh); return sh.offsetHeight <= room; }
@@ -598,86 +594,92 @@
     }
 
     function update() {
-      count.textContent = pages.length > 1 ? (s + 1) + ' / ' + pages.length : '';
+      var to = Math.min(s + per, pages.length);
+      count.textContent = pages.length > 1 ? (s + 1) + (to > s + 1 ? '-' + to : '') + ' / ' + pages.length : '';
       prev.style.visibility = s > 0 ? '' : 'hidden';
-      next.style.visibility = s < pages.length - 1 ? '' : 'hidden';
+      next.style.visibility = s + per < pages.length ? '' : 'hidden';
     }
-    function settle(sheet, t) {
-      cur = sheet; s = t; busy = false; last = Date.now();
-      cur.style.zIndex = 2;
+    // Lays the folder open at sheet t (and t + 1 beside it).
+    function place(t) {
+      spread.replaceChildren();
+      if (!narrow) { L = leaf(t, 'left'); spread.appendChild(L); }
+      R = leaf(narrow ? t : t + 1, 'right');
+      spread.appendChild(R);
+      s = t; busy = false; last = Date.now();
       update();
     }
-    // The curl: the sheet is picked up by its bottom-left corner and rolled over towards the top-right.
-    // A fold line sweeps across the sheet; the part behind the line is hidden, and its mirror image is
-    // drawn as the underside of the paper rolling over. "from" and "to" are how far the fold has gone (0 to 1).
-    // "under" runs the same roll beneath the stack, which is how a sheet travels round to the back.
-    function curl(sheet, from, to, ms, under, end) {
-      var w = sheet.offsetWidth, ht = sheet.offsetHeight, L = Math.sqrt(w * w + ht * ht);
-      if (document.hidden || !L) { sheet.style.clipPath = ''; end(); return; }
-      var dx = w / L, dy = -ht / L, ang = Math.atan2(dx, -dy) * 180 / Math.PI;
-      var flap = h('div', { class: 'flap' }), wrap = h('div', { class: 'curl' }, flap);
-      wrap.style.zIndex = under ? 0 : 4;
-      sheet.style.zIndex = under ? 0 : 3;
-      stack.insertBefore(wrap, sheet.nextSibling);
-      function cut(s, far) {
-        var pts = [[0, 0], [w, 0], [w, ht], [0, ht]], out = [];
-        for (var i = 0; i < 4; i++) {
-          var a = pts[i], b = pts[(i + 1) % 4];
-          var fa = a[0] * dx + (a[1] - ht) * dy - s, fb = b[0] * dx + (b[1] - ht) * dy - s;
-          var ia = far ? fa >= 0 : fa <= 0, ib = far ? fb >= 0 : fb <= 0;
-          if (ia) out.push(a);
-          if (ia !== ib) { var k = fa / (fa - fb); out.push([a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]); }
-        }
-        if (out.length < 3) return 'polygon(0 0, 0 0, 0 0)';
-        return 'polygon(' + out.map(function (p) { return p[0].toFixed(1) + 'px ' + p[1].toFixed(1) + 'px'; }).join(',') + ')';
+    // The curl. "front" is the right-hand sheet being lifted; "back" is what is printed on its other side,
+    // which ends up lying on the left. The bottom-right corner travels in an arc to the bottom-left; the
+    // paper folds along the line halfway between where the corner was and where it is now. Everything on
+    // the far side of that line is hidden and drawn again mirrored, as the underside rolling over.
+    function curl(front, back, from, to, ms, end) {
+      var w = spread.clientWidth / 2, ht = spread.clientHeight, W = 2 * w;
+      var shade = h('div', { class: 'shade' }), wrap = h('div', { class: 'curlw' }, back, shade);
+      spread.appendChild(wrap);
+      function poly(pts) {
+        if (pts.length < 3) return 'polygon(0 0, 0 0, 0 0)';
+        return 'polygon(' + pts.map(function (q) { return q[0].toFixed(1) + 'px ' + q[1].toFixed(1) + 'px'; }).join(',') + ')';
       }
-      function draw(s) {
-        var m = 2 * (s + ht * dy);
-        sheet.style.clipPath = cut(s, true);
-        flap.style.clipPath = cut(s, false);
-        flap.style.transform = 'matrix(' + [1 - 2 * dx * dx, -2 * dx * dy, -2 * dx * dy, 1 - 2 * dy * dy, m * dx, m * dy].map(function (n) { return n.toFixed(4); }).join(',') + ')';
-        // Shading that follows the fold, so the underside reads as rounded rather than creased.
-        flap.style.background = 'linear-gradient(' + ang.toFixed(2) + 'deg, #f1f1f1 0px, #f1f1f1 ' + Math.max(s - 150, 0).toFixed(1) + 'px, #ffffff ' + Math.max(s - 55, 0).toFixed(1) + 'px, #dedede ' + Math.max(s - 16, 0).toFixed(1) + 'px, #b9b9b9 ' + s.toFixed(1) + 'px)';
+      function draw(e) {
+        // The corner swings round the foot of the spine, so the sheet always stays attached along the fold of the folder.
+        var cx = w + w * Math.cos(Math.PI * e), cy = ht - w * Math.sin(Math.PI * e);
+        var vx = cx - W, vy = cy - ht, len = Math.sqrt(vx * vx + vy * vy);
+        if (len < 1) { front.style.clipPath = ''; back.style.clipPath = shade.style.clipPath = poly([]); return; }
+        var dx = vx / len, dy = vy / len, mx = (W + cx) / 2, my = (ht + cy) / 2;
+        function side(q) { return (q[0] - mx) * dx + (q[1] - my) * dy; }
+        function mirror(q) { var k = 2 * side(q); return [q[0] - k * dx, q[1] - k * dy]; }
+        function cut(keep) {
+          var pts = [[w, 0], [W, 0], [W, ht], [w, ht]], out = [];
+          for (var i = 0; i < 4; i++) {
+            var a = pts[i], b = pts[(i + 1) % 4], fa = side(a), fb = side(b);
+            var ia = keep ? fa >= 0 : fa <= 0, ib = keep ? fb >= 0 : fb <= 0;
+            if (ia) out.push(a);
+            if (ia !== ib) { var k = fa / (fa - fb); out.push([a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]); }
+          }
+          return out;
+        }
+        var lifted = cut(false);
+        front.style.clipPath = poly(cut(true).map(function (q) { return [q[0] - w, q[1]]; }));
+        back.style.clipPath = poly(lifted.map(function (q) { return [W - q[0], q[1]]; }));
+        // Where a point of the left-hand sheet sits right now: flipped across the spine, then across the fold.
+        function at(x, y) { return mirror([W - x, y]); }
+        var o = at(0, 0), ax = at(1, 0), ay = at(0, 1);
+        back.style.transform = 'matrix(' + [ax[0] - o[0], ax[1] - o[1], ay[0] - o[0], ay[1] - o[1], o[0], o[1]].map(function (n) { return n.toFixed(5); }).join(',') + ')';
+        // Shading that hugs the fold, so the paper reads as rounded rather than creased.
+        var glen = Math.abs(W * dx) + Math.abs(ht * dy), g0 = (mx - W / 2) * dx + (my - ht / 2) * dy + glen / 2;
+        shade.style.clipPath = poly(lifted.map(mirror));
+        shade.style.background = 'linear-gradient(' + (Math.atan2(dx, -dy) * 180 / Math.PI).toFixed(2) + 'deg, rgba(0,0,0,.34) ' + g0.toFixed(1) + 'px, rgba(0,0,0,.12) ' + (g0 + 14).toFixed(1) + 'px, rgba(0,0,0,.03) ' + (g0 + 46).toFixed(1) + 'px, rgba(255,255,255,.5) ' + (g0 + 70).toFixed(1) + 'px, rgba(255,255,255,0) ' + (g0 + 150).toFixed(1) + 'px)';
       }
       var t0 = performance.now();
-      draw(from * L);
+      draw(from);
       requestAnimationFrame(function frame(now) {
-        var k = Math.min(Math.max((now - t0) / ms, 0), 1), e = from < to ? k * k : 1 - (1 - k) * (1 - k); // speeds up on the way out, slows on the way in, so the two halves join
-        draw((from + (to - from) * e) * L);
+        var k = Math.min(Math.max((now - t0) / ms, 0), 1), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        draw(from + (to - from) * e);
         if (k < 1) return requestAnimationFrame(frame);
-        wrap.remove();
         end();
       });
     }
     function turn(dir) {
-      var t = s + dir;
+      var t = s + dir * per;
       if (busy || t < 0 || t >= pages.length) return;
       last = Date.now();
-      var other = sheetOf(t), old = cur;
-      if (still) { stack.replaceChild(other, old); settle(other, t); return; }
+      if (still || narrow || document.hidden) { place(t); return; }
       busy = true;
-      // One continuous roll: the sheet curls off towards the top-right corner, carries on over the edge,
-      // and the same roll unwinds underneath the stack until the sheet lies flat at the back.
+      var front, back;
       if (dir > 0) {
-        other.style.zIndex = 2;
-        stack.insertBefore(other, old);
-        curl(old, 0, 1.02, 600, false, function () {
-          curl(old, 1.02, 0, 520, true, function () {
-            old.remove();
-            settle(other, t);
-          });
-        });
+        // The sheet after next is already lying underneath on the right. Curl the right-hand sheet over.
+        var under = leaf(t + 1, 'right');
+        spread.insertBefore(under, R);
+        front = R; back = leaf(t, 'left');
+        curl(front, back, 0, 1, 900, function () { place(t); });
       } else {
-        // Going back is the same roll the other way: out from the back, over the corner, down on top.
-        stack.insertBefore(other, old);
-        old.style.zIndex = 2;
-        curl(other, 0, 1.02, 520, true, function () {
-          curl(other, 1.02, 0, 600, false, function () {
-            other.style.clipPath = '';
-            old.remove();
-            settle(other, t);
-          });
-        });
+        // Going back: the left-hand sheet curls back over to the right.
+        back = L;
+        L = leaf(t, 'left');
+        spread.insertBefore(L, spread.firstChild);
+        front = leaf(t + 1, 'right');
+        spread.appendChild(front);
+        curl(front, back, 1, 0, 900, function () { place(t); });
       }
     }    // Scrolling never moves anything: one wheel gesture or swipe is one page.
     function wheel(e) {
@@ -710,20 +712,16 @@
 
     document.addEventListener('keydown', key);
     overlay.addEventListener('wheel', wheel, { passive: false });
-    stack.addEventListener('touchstart', touchStart, { passive: true });
-    stack.addEventListener('touchmove', touchMove, { passive: false });
-    stack.addEventListener('touchend', touchEnd);
+    spread.addEventListener('touchstart', touchStart, { passive: true });
+    spread.addEventListener('touchmove', touchMove, { passive: false });
+    spread.addEventListener('touchend', touchEnd);
     document.documentElement.classList.add('locked'); // the page behind stays still while a folder is open
     document.body.appendChild(overlay);
     // Order of the sheets: first image, then the writing on as many sheets as it needs, then the other images.
     if (p.images[0]) pages.push(pic(p.images[0]));
     paginate().forEach(function (d) { pages.push(paper(d)); });
     p.images.slice(1).forEach(function (r) { pages.push(pic(r)); });
-    cur = sheetOf(0);
-    cur.style.zIndex = 2;
-    stack.appendChild(cur);
-    if (pages.length < 2 || narrow) cover.querySelector('.cover-hint').textContent = pages.length < 2 ? '' : 'Swipe or use the arrows to turn the page';
-    update();
+    place(0);
     close.focus();
   }
   function projects() {
