@@ -505,3 +505,23 @@ html.locked, html.locked body { overflow: hidden; }
   .cb-msg textarea { min-height: 90px; }
 }
 @media (prefers-reduced-motion: reduce) { .floaty { animation: none; } .flipper { transition: none; } }
+/* ===== version 18: open folder with the cover on one side and a stack of paper on the other ===== */
+.dossier .open { display: grid; grid-template-columns: minmax(0, .72fr) minmax(0, 1fr); gap: clamp(10px, 1.6vw, 22px); height: min(66vh, 580px); }
+.cover { color: var(--fct, #fff); padding: clamp(8px, 1.6vw, 22px) clamp(8px, 1.6vw, 22px) clamp(8px, 1.6vw, 22px) clamp(6px, 1vw, 14px); display: flex; flex-direction: column; gap: 10px; border-right: 1px dashed currentColor; min-width: 0; }
+.cover h3 { font-weight: 400; font-size: clamp(18px, 2.1vw, 36px); line-height: 1.15; margin: 0; overflow-wrap: anywhere; }
+.cover-role { margin: 0; font-size: clamp(12px, 1.05vw, 18px); }
+.cover-hint { margin: auto 0 0; font-size: 12px; }
+.stack { position: relative; perspective: 1900px; perspective-origin: 50% 0; min-width: 0; }
+.stack::before { content: ''; position: absolute; inset: 10px 0 0 10px; background: #dcdcdc; }
+.stack::after { content: ''; position: absolute; inset: 5px 5px 5px 5px; background: #ececec; }
+.paper { position: absolute; inset: 0 10px 10px 0; z-index: 2; transform-origin: 50% 0; transform-style: preserve-3d; }
+.paper.probe { visibility: hidden; pointer-events: none; }
+.pface { position: absolute; inset: 0; background: #fff; padding: clamp(14px, 2vw, 30px); overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; box-shadow: 0 0 0 1px rgba(0, 0, 0, .08); }
+.pface.back { transform: rotateX(180deg); background: #f6f6f6; }
+@media (max-width: 760px) {
+  .dossier .open { grid-template-columns: minmax(0, 1fr); height: min(66vh, 560px); }
+  .cover { display: none; }
+  .pface { padding: 16px; }
+  .pface .sheet.text h3 { font-size: 18px; }
+  .pface .sheet.text p { font-size: 14px; }
+}
