@@ -31,6 +31,7 @@
         reelLabel: 'NEW DEMO REEL',
         contactHeading: 'Lets Connect',
         contactBlurb: 'Have a project in mind? Send a message.',
+        cardName: 'narciso lontoc',
         email: 'narcisolontoc@gmail.com',
         handle: '@narsheessho',
         linkedin: '', facebook: '', instagram: '',
@@ -367,5 +368,32 @@
     }
     return svg;
   }
-  window.UI = { h: h, img: img, folder: folder };
+  // Pixel-art arrows, drawn from these grids so they stay crisp at any size.
+  var GRID = {
+    down: ['...##...', '...##...', '...##...', '##.##.##', '.######.', '..####..', '...##...'],
+    right: ['##....', '.##...', '..##..', '...##.', '..##..', '.##...', '##....']
+  };
+  function arrow(dir) {
+    var rows = dir === 'up' ? GRID.down.slice().reverse() : dir === 'down' ? GRID.down
+      : dir === 'left' ? GRID.right.map(function (r) { return r.split('').reverse().join(''); }) : GRID.right;
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + rows[0].length + ' ' + rows.length);
+    svg.setAttribute('class', 'px-arrow px-' + dir);
+    svg.setAttribute('shape-rendering', 'crispEdges');
+    svg.setAttribute('aria-hidden', 'true');
+    rows.forEach(function (row, y) {
+      for (var x = 0; x < row.length; x++) {
+        if (row[x] !== '#') continue;
+        var start = x;
+        while (row[x + 1] === '#') x++;
+        var r = document.createElementNS(NS, 'rect');
+        r.setAttribute('x', start); r.setAttribute('y', y);
+        r.setAttribute('width', x - start + 1); r.setAttribute('height', 1);
+        r.setAttribute('fill', 'currentColor');
+        svg.appendChild(r);
+      }
+    });
+    return svg;
+  }
+  window.UI = { h: h, img: img, folder: folder, arrow: arrow };
 })();

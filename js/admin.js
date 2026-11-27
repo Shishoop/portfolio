@@ -260,7 +260,7 @@
 
   function contactView() {
     return textForm('Contact info', [
-      ['contactHeading', 'Contact page heading'], ['contactBlurb', 'Contact page intro', 'long'],
+      ['contactHeading', 'Contact page heading'], ['cardName', 'Name on the calling card'], ['contactBlurb', 'Contact page intro', 'long'],
       ['email', 'Email', 'email'], ['handle', 'Handle'],
       ['linkedin', 'Linkedin link', 'url'], ['facebook', 'Facebook link', 'url'], ['instagram', 'Instagram link', 'url']
     ]);

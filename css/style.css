@@ -174,3 +174,79 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   .marquee div { animation: none; }
   .intro, .intro span, .fwrap, .chev { transition: none; }
 }
+
+/* ===== version 2: pixel arrows, fluid motion, calling card ===== */
+@view-transition { navigation: auto; }
+:root { --ease: cubic-bezier(.16, 1, .3, 1); }
+
+/* pixel arrows bob gently while idle and settle when you point at them */
+.px-arrow { display: block; height: auto; animation: bob 1.5s ease-in-out infinite; }
+@keyframes bob { 0%, 100% { transform: translateY(-3px); } 50% { transform: translateY(3px); } }
+.catnav .arrow { margin: 6px 0 4px; }
+.catnav .arrow .px-arrow { width: clamp(12px, 1.1vw, 18px); margin: 0 auto; }
+.catnav a:nth-child(2) .px-arrow { animation-delay: .15s; }
+.catnav a:nth-child(3) .px-arrow { animation-delay: .3s; }
+.catnav a:nth-child(4) .px-arrow { animation-delay: .45s; }
+.chev .px-arrow { width: clamp(14px, 1.3vw, 24px); }
+.chev { transition: transform .3s var(--ease); }
+.totop .px-arrow { width: 16px; }
+.totop { transition: transform .3s var(--ease), background .2s; }
+.totop:hover { transform: translateY(-4px); }
+a:hover .px-arrow, button:hover .px-arrow, a:focus-visible .px-arrow, button:focus-visible .px-arrow { animation-play-state: paused; }
+.catnav .bar { transition: transform .4s var(--ease); transform-origin: left; }
+.catnav a:hover .bar { transform: scaleY(1.6); }
+
+/* things ease into place as they enter the screen */
+.reveal { opacity: 0; transform: translateY(28px); transition: opacity .9s var(--ease), transform .9s var(--ease); }
+.reveal.in { opacity: 1; transform: none; }
+.swap { animation: swap .55s var(--ease) both; }
+@keyframes swap { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
+.intro span { animation: breathe 2.6s ease-in-out infinite; }
+@keyframes breathe { 0%, 100% { opacity: .55; letter-spacing: .04em; } 50% { opacity: 1; letter-spacing: .14em; } }
+.mark .tag { animation: swap .9s var(--ease) both; }
+.mark .t1 { animation-delay: .35s; } .mark .t2 { animation-delay: .5s; } .mark .t3 { animation-delay: .65s; } .mark .t4 { animation-delay: .8s; }
+.roles:not([hidden]) .role { animation: swap .6s var(--ease) both; }
+.roles .role:nth-child(2) { animation-delay: .08s; } .roles .role:nth-child(3) { animation-delay: .16s; } .roles .role:nth-child(4) { animation-delay: .24s; }
+.fwrap { transition: transform .45s var(--ease); }
+.thumbs button img, .ux .side img { transition: transform .6s var(--ease); }
+.thumbs button:hover img, .ux .side button:hover img { transform: scale(1.06); }
+.btn, .pop .go, .field input, .field textarea { transition: background .25s, color .25s, border-color .25s, box-shadow .25s; }
+.field input:focus, .field textarea:focus { outline: none; box-shadow: 4px 4px 0 #000; }
+.nav a { background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; padding-bottom: 5px; transition: background-size .4s var(--ease); }
+.nav a:hover, .nav a[aria-current] { text-decoration: none; background-size: 100% 1px; }
+.overlay { animation: fade .3s ease both; }
+.overlay .pop { animation: pop .5s var(--ease) both; }
+.overlay.out { animation: fade .2s ease reverse both; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop { from { opacity: 0; transform: translateY(26px) scale(.96); } to { opacity: 1; transform: none; } }
+
+/* contact: a calling card */
+.contact-page { display: grid; justify-items: center; gap: clamp(28px, 4vw, 64px); padding: 0 var(--pad) clamp(50px, 7vw, 130px); }
+.card-wrap { perspective: 1400px; width: min(100%, 760px); }
+.ccard { aspect-ratio: 1.75; background: #fff; border: 1px solid #000; box-shadow: 10px 10px 0 #000; display: grid; grid-template-columns: 34% minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: clamp(10px, 2.4vw, 26px) clamp(14px, 4vw, 44px); padding: clamp(14px, 3.4vw, 40px); align-items: center; animation: float 6s ease-in-out infinite; transition: transform .6s var(--ease), box-shadow .6s var(--ease); will-change: transform; }
+.ccard.tilt { animation: none; transition: transform .12s linear, box-shadow .3s; box-shadow: 16px 18px 0 #000; }
+@keyframes float { 0%, 100% { transform: translateY(0) rotate(-.6deg); } 50% { transform: translateY(-10px) rotate(.6deg); } }
+.cc-logo img { width: 100%; }
+.cc-body { min-width: 0; }
+.cc-name { font-family: var(--font-sans); font-style: italic; font-weight: 400; font-size: clamp(22px, 4.6vw, 52px); line-height: 1; margin: 0 0 .25em; }
+.cc-roles { color: var(--mute); font-size: clamp(9px, 1.25vw, 14px); margin: 0 0 clamp(8px, 2vw, 22px); }
+.cc-lines { display: grid; gap: clamp(2px, .6vw, 8px); font-size: clamp(11px, 1.7vw, 19px); border-top: 3px solid #000; padding-top: clamp(8px, 1.6vw, 18px); }
+.cc-lines a { text-decoration: none; overflow-wrap: anywhere; }
+.cc-lines a[href]:hover { text-decoration: underline; }
+.cc-social { display: flex; flex-wrap: wrap; gap: 0 1.2em; color: var(--mute); }
+.cc-bars { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.cc-bars span { height: clamp(4px, .7vw, 8px); }
+.contact-page .blurb { font-family: var(--font-sans); font-size: clamp(20px, 2vw, 34px); margin: 0; text-align: center; }
+.contact-page .win { width: min(100%, 640px); }
+
+@media (max-width: 560px) {
+  .ccard { aspect-ratio: auto; grid-template-columns: minmax(0, 1fr); box-shadow: 7px 7px 0 #000; }
+  .cc-logo { width: 46%; }
+  .cc-name { font-size: 34px; }
+  .cc-roles { font-size: 11px; }
+  .cc-lines { font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .px-arrow, .ccard, .intro span, .mark .tag, .swap, .overlay, .overlay .pop, .roles .role { animation: none !important; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+}

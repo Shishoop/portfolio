@@ -73,7 +73,7 @@
   }
 
   function toTop() {
-    var b = h('button', { class: 'totop', 'aria-label': 'Back to top', text: '↑', onclick: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); } });
+    var b = h('button', { class: 'totop', 'aria-label': 'Back to top', onclick: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); } }, UI.arrow('up'));
     // Stays out of the way of the footer links at the very bottom of the page.
     var place = function () {
       var nearEnd = window.innerHeight + window.scrollY > document.documentElement.scrollHeight - 140;
@@ -135,16 +135,16 @@
     function show(n) {
       i = (n + list.length) % list.length;
       var p = list[i];
-      stage.replaceChildren(p.images[0] ? img(p.images[0], '', p.title) : '');
-      cap.replaceChildren(h('h3', { text: p.title }), h('p', { text: p.description }));
+      stage.replaceChildren(p.images[0] ? img(p.images[0], 'swap', p.title) : '');
+      cap.replaceChildren(h('h3', { class: 'swap', text: p.title }), h('p', { class: 'swap', text: p.description }));
       Array.prototype.forEach.call(thumbs.children, function (b, n2) { n2 === i ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current'); });
     }
     show(0);
     return h('div', { class: 'gd' },
       h('div', { class: 'viewer' },
-        h('button', { class: 'chev', 'aria-label': 'Previous', text: '<', onclick: function () { show(i - 1); } }),
+        h('button', { class: 'chev', 'aria-label': 'Previous', onclick: function () { show(i - 1); } }, UI.arrow('left')),
         stage,
-        h('button', { class: 'chev', 'aria-label': 'Next', text: '>', onclick: function () { show(i + 1); } }),
+        h('button', { class: 'chev', 'aria-label': 'Next', onclick: function () { show(i + 1); } }, UI.arrow('right')),
         cap),
       thumbs);
   }
@@ -214,9 +214,9 @@
     var panel = h('div', { class: 'panel' });
     var close = h('button', { class: 'x', 'aria-label': 'Close', text: '✕', onclick: done });
     var overlay = h('div', { class: 'overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Project' },
-      h('button', { class: 'chev', 'aria-label': 'Previous project', text: '<', onclick: function () { show(i - 1); } }),
+      h('button', { class: 'chev', 'aria-label': 'Previous project', onclick: function () { show(i - 1); } }, UI.arrow('left')),
       h('div', { class: 'pop' }, close, panel),
-      h('button', { class: 'chev', 'aria-label': 'Next project', text: '>', onclick: function () { show(i + 1); } }));
+      h('button', { class: 'chev', 'aria-label': 'Next project', onclick: function () { show(i + 1); } }, UI.arrow('right')));
     function show(n) {
       i = (n + list.length) % list.length;
       var p = list[i];
@@ -226,6 +226,7 @@
       panel.replaceChildren(pics, h('div', { class: 'text' },
         h('h3', { text: p.title }), h('p', { text: p.description }),
         p.link ? h('a', { class: 'go', href: p.link, target: '_blank', rel: 'noopener', text: 'View project' }) : null));
+      panel.classList.remove('swap'); void panel.offsetWidth; panel.classList.add('swap');
     }
     function key(e) {
       if (e.key === 'Escape') done();
@@ -234,7 +235,8 @@
     }
     function done() {
       document.removeEventListener('keydown', key);
-      overlay.remove();
+      overlay.classList.add('out');
+      setTimeout(function () { overlay.remove(); }, 220);
       if (opener) opener.focus();
     }
     overlay.addEventListener('click', function (e) { if (e.target === overlay) done(); });
@@ -249,7 +251,7 @@
     var render = { graphic: graphic, video: video, uiux: uiux, developer: developer };
     app.append(nav(), h('h1', { class: 'ptitle', text: s.projectsTitle }),
       h('nav', { class: 'catnav', 'aria-label': 'Project categories' }, CATS.map(function (c, i) {
-        return h('a', { href: '#' + c }, s.roles[i], h('span', { class: 'arrow', 'aria-hidden': 'true', text: '↓' }), h('span', { class: 'bar b' + (i + 1) }));
+        return h('a', { href: '#' + c }, s.roles[i], h('span', { class: 'arrow' }, UI.arrow('down')), h('span', { class: 'bar b' + (i + 1) }));
       })));
     CATS.forEach(function (c, i) {
       var list = byCat(c);
@@ -268,6 +270,31 @@
   }
 
   /* ---------- contact ---------- */
+  function callingCard(s) {
+    var card = h('div', { class: 'ccard' },
+      h('div', { class: 'cc-logo' }, h('img', { src: 'assets/footer-logo.png', alt: 'narsheessho' })),
+      h('div', { class: 'cc-body' },
+        h('p', { class: 'cc-name', text: s.cardName }),
+        h('p', { class: 'cc-roles', text: s.roles.join(' / ') }),
+        h('div', { class: 'cc-lines' },
+          h('a', { href: 'mailto:' + s.email, text: s.email }),
+          h('a', { text: s.handle }),
+          h('span', { class: 'cc-social' }, link('Linkedin', s.linkedin), link('Facebook', s.facebook), link('Instagram', s.instagram)))),
+      h('div', { class: 'cc-bars', 'aria-hidden': 'true' }, [1, 2, 3, 4].map(function (n) { return h('span', { class: 'b' + n }); })));
+    var wrap = h('div', { class: 'card-wrap' }, card);
+    // The card leans toward the pointer, like turning a real card in your hand.
+    if (window.matchMedia('(hover: hover) and (prefers-reduced-motion: no-preference)').matches) {
+      wrap.addEventListener('mousemove', function (e) {
+        var r = wrap.getBoundingClientRect();
+        var x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+        card.classList.add('tilt');
+        card.style.transform = 'rotateY(' + (x * 12).toFixed(2) + 'deg) rotateX(' + (-y * 12).toFixed(2) + 'deg)';
+      });
+      wrap.addEventListener('mouseleave', function () { card.style.transform = ''; card.classList.remove('tilt'); });
+    }
+    return wrap;
+  }
+
   function contact() {
     var s = C.site;
     var note = h('p', { class: 'note', role: 'status' });
@@ -296,19 +323,36 @@
         note,
         h('div', { style: 'text-align:right' }, h('button', { class: 'btn', type: 'submit', text: 'Send' }))));
     app.append(nav(), h('h1', { class: 'chead', text: s.contactHeading }),
-      h('div', { class: 'contact' },
-        h('div', null,
-          h('p', { class: 'blurb', text: s.contactBlurb }),
-          h('div', { class: 'info' },
-            h('a', { href: 'mailto:' + s.email, text: s.email }),
-            h('a', { text: s.handle }),
-            link('Linkedin', s.linkedin), link('Facebook', s.facebook), link('Instagram', s.instagram))),
-        form),
+      h('div', { class: 'contact-page' }, callingCard(s), h('p', { class: 'blurb', text: s.contactBlurb }), form),
       footer(), toTop());
+  }
+
+  // Elements ease into place as they scroll into view.
+  function animate() {
+    if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var el = e.target;
+        io.unobserve(el);
+        el.classList.add('in');
+        setTimeout(function () { el.classList.remove('reveal', 'in'); el.style.transitionDelay = ''; }, 1600);
+      });
+    }, { rootMargin: '0px 0px -6% 0px' });
+    var counts = new Map();
+    var pick = '.mark, .hero-foot, .about > *, .tools img, .ptitle, .catnav a, .section > h2, .gd > *, .section > div:not(.gd):not(.folders), .folders > *, .chead, .card-wrap, .contact-page > .blurb, .contact-page > .win, .footer .row';
+    Array.prototype.forEach.call(document.querySelectorAll(pick), function (el) {
+      var n = counts.get(el.parentNode) || 0;
+      counts.set(el.parentNode, n + 1);
+      el.classList.add('reveal');
+      el.style.transitionDelay = Math.min(n * 70, 490) + 'ms';
+      io.observe(el);
+    });
   }
 
   Store.load().then(function (content) {
     C = content;
     ({ home: home, about: about, projects: projects, contact: contact })[page]();
+    animate();
   });
 })();
