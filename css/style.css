@@ -352,3 +352,5 @@ a:hover .px-arrow, button:hover .px-arrow, a:focus-visible .px-arrow, button:foc
 .phero .ptitle { margin: 0; }.catnav a { animation: swap .9s var(--ease) both; }
 .catnav a:nth-child(1) { animation-delay: .25s; } .catnav a:nth-child(2) { animation-delay: .35s; } .catnav a:nth-child(3) { animation-delay: .45s; } .catnav a:nth-child(4) { animation-delay: .55s; }
 @media (prefers-reduced-motion: reduce) { .catnav a { animation: none; } }
+/* nav links carry no underline, on hover or on the current page */
+.nav a, .nav a:hover, .nav a[aria-current] { background: none; text-decoration: none; padding-bottom: 0; }
