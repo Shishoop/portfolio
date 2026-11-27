@@ -505,10 +505,23 @@
   }
   function developer(list) {
     var grid = h('div', { class: 'folders' });
+    // Each folder is a back, a few sheets and a front flap. Hovering tips the flap forward so the sheets
+    // show, with a note of how many pages are inside.
+    var counters = [];
     list.forEach(function (p, n) {
-      grid.append(h('button', { onclick: function (e) { popup(p, e.currentTarget, p.color || SHADES[n % 4]); } },
-        h('span', { class: 'fwrap', style: 'display:block' }, folder(p.color || SHADES[n % 4], { strip: true })),
+      var col = p.color || SHADES[n % 4], pc = h('span', { class: 'fpages' });
+      grid.append(h('button', { onclick: function (e) { popup(p, e.currentTarget, col); } },
+        h('span', { class: 'fwrap fopen', style: 'display:block;' + tint(col) }, folder(col),
+          h('span', { class: 'fpaper' }, pc), h('span', { class: 'ffront' }, h('i'))),
         h('span', { class: 'name', text: p.title })));
+      counters.push(function () {
+        var k = popup(p, null, col, true);
+        pc.textContent = k + (k === 1 ? ' page' : ' pages');
+      });
+    });
+    // Pages are counted by laying each project out once, unseen, after the fonts have arrived.
+    (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(function () {
+      setTimeout(function () { counters.forEach(function (run) { try { run(); } catch (e) {} }); }, 400);
     });
     // Dotted folders fill the rest of the grid. Only a signed-in admin gets the "+" shortcut.
     var admin = Store.signedIn();
@@ -531,7 +544,7 @@
   // page curls the right-hand sheet over by its bottom corner and lays it down on the left. Nothing
   // scrolls: long writing runs on to the next sheet. Arrows, the mouse wheel, a swipe or the arrow keys
   // turn pages; the X closes.
-  function popup(p, opener, color) {
+  function popup(p, opener, color, probe) {
     var narrow = window.matchMedia('(max-width: 760px)').matches;
     var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var per = narrow ? 1 : 2; // phones show one sheet at a time
@@ -710,21 +723,40 @@
       if (opener) opener.focus();
     }
 
+    if (probe) { overlay.style.visibility = 'hidden'; overlay.style.animation = 'none'; overlay.style.pointerEvents = 'none'; }
+    document.body.appendChild(overlay);
+    // Order of the sheets: first image, then the writing on as many sheets as it needs, then the other images.
+    if (p.images[0]) pages.push(pic(p.images[0]));
+    paginate().forEach(function (d) { pages.push(paper(d)); });
+    p.images.slice(1).forEach(function (r) { pages.push(pic(r)); });
+    if (probe) { overlay.remove(); return pages.length; } // only counting the pages
+
     document.addEventListener('keydown', key);
     overlay.addEventListener('wheel', wheel, { passive: false });
     spread.addEventListener('touchstart', touchStart, { passive: true });
     spread.addEventListener('touchmove', touchMove, { passive: false });
     spread.addEventListener('touchend', touchEnd);
     document.documentElement.classList.add('locked'); // the page behind stays still while a folder is open
-    document.body.appendChild(overlay);
-    // Order of the sheets: first image, then the writing on as many sheets as it needs, then the other images.
-    if (p.images[0]) pages.push(pic(p.images[0]));
-    paginate().forEach(function (d) { pages.push(paper(d)); });
-    p.images.slice(1).forEach(function (r) { pages.push(pic(r)); });
     place(0);
     close.focus();
-  }
-  function projects() {
+
+    // Opening: the closed folder grows out of the one that was clicked, then its front flap falls open.
+    var dossier = overlay.querySelector('.dossier'), from = opener && opener.querySelector('.fwrap');
+    if (!still && !document.hidden && from) {
+      var lid = h('div', { class: 'lid' }, h('i'), h('span', { text: p.title }));
+      dossier.appendChild(lid);
+      dossier.style.animation = 'none';
+      var a = from.getBoundingClientRect(), b = dossier.getBoundingClientRect();
+      if (a.width && b.width) {
+        dossier.animate([
+          { transform: 'translate(' + (a.left + a.width / 2 - b.left - b.width / 2).toFixed(1) + 'px,' + (a.top + a.height / 2 - b.top - b.height / 2).toFixed(1) + 'px) scale(' + (a.width / b.width).toFixed(4) + ',' + (a.height / b.height).toFixed(4) + ')' },
+          { transform: 'none' }
+        ], { duration: 460, easing: 'cubic-bezier(.3, .1, .2, 1)' });
+      }
+      lid.addEventListener('animationend', function () { lid.remove(); });
+      setTimeout(function () { lid.remove(); }, 1600);
+    }
+  }  function projects() {
     var s = C.site;
     var render = { graphic: graphic, video: video, uiux: uiux, developer: developer };
     app.append(h('header', { class: 'phero' }, nav(), h('div', { class: 'pmid' }, h('h1', { class: 'ptitle', text: s.projectsTitle })),
