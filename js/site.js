@@ -741,21 +741,47 @@
     place(0);
     close.focus();
 
-    // Opening: the closed folder grows out of the one that was clicked, then its front flap falls open.
+    // Opening: the folder that was clicked turns upright into portrait while it grows into place, closed.
+    // Then it opens in half: the front cover lifts away from the right, and the left half folds down flat.
     var dossier = overlay.querySelector('.dossier'), from = opener && opener.querySelector('.fwrap');
-    if (!still && !document.hidden && from) {
-      var lid = h('div', { class: 'lid' }, h('i'), h('span', { text: p.title }));
-      dossier.appendChild(lid);
+    if (!still && !narrow && !document.hidden && from) {
       dossier.style.animation = 'none';
-      var a = from.getBoundingClientRect(), b = dossier.getBoundingClientRect();
-      if (a.width && b.width) {
-        dossier.animate([
-          { transform: 'translate(' + (a.left + a.width / 2 - b.left - b.width / 2).toFixed(1) + 'px,' + (a.top + a.height / 2 - b.top - b.height / 2).toFixed(1) + 'px) scale(' + (a.width / b.width).toFixed(4) + ',' + (a.height / b.height).toFixed(4) + ')' },
-          { transform: 'none' }
-        ], { duration: 460, easing: 'cubic-bezier(.3, .1, .2, 1)' });
+      var a = from.getBoundingClientRect(), b = dossier.getBoundingClientRect(), cw = b.width / 2;
+      if (!a.width || !cw) return;
+      var shut = h('div', { class: 'shut', style: tint(color) + ';left:' + (b.left + cw) + 'px;top:' + b.top + 'px;width:' + cw + 'px;height:' + b.height + 'px' }, h('i'), h('b'));
+      var tidied = false;
+      function tidy() {
+        if (tidied) return;
+        tidied = true;
+        dossier.style.visibility = '';
+        dossier.style.clipPath = '';
+        Array.prototype.forEach.call(overlay.querySelectorAll('.shut, .twin'), function (el) { el.remove(); });
       }
-      lid.addEventListener('animationend', function () { lid.remove(); });
-      setTimeout(function () { lid.remove(); }, 1600);
+      overlay.appendChild(shut);
+      dossier.style.visibility = 'hidden';
+      var dx = a.left + a.width / 2 - (b.left + cw * 1.5), dy = a.top + a.height / 2 - (b.top + b.height / 2);
+      shut.animate([
+        { transform: 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px) rotate(-90deg) scale(' + (a.height / cw).toFixed(4) + ',' + (a.width / b.height).toFixed(4) + ')' },
+        { transform: 'translate(0px,0px) rotate(0deg) scale(1,1)' }
+      ], { duration: 620, easing: 'cubic-bezier(.4, 0, .2, 1)' }).onfinish = function () {
+        if (tidied) return;
+        // The pages wait underneath on the right; the left half is not there until the cover comes over.
+        dossier.style.visibility = '';
+        dossier.style.clipPath = 'inset(-60px -40px -20px 50%)';
+        shut.style.transformOrigin = '0 50%';
+        shut.animate([{ transform: 'perspective(2200px) rotateY(0deg)' }, { transform: 'perspective(2200px) rotateY(-90deg)' }],
+          { duration: 340, easing: 'cubic-bezier(.5, 0, .9, .6)', fill: 'forwards' }).onfinish = function () {
+          if (tidied) return;
+          shut.remove();
+          var twin = dossier.cloneNode(true);
+          twin.classList.add('twin');
+          twin.style.cssText = tint(color) + ';left:' + b.left + 'px;top:' + b.top + 'px;width:' + b.width + 'px;height:' + b.height + 'px';
+          overlay.appendChild(twin);
+          twin.animate([{ transform: 'perspective(2200px) rotateY(90deg)' }, { transform: 'perspective(2200px) rotateY(0deg)' }],
+            { duration: 420, easing: 'cubic-bezier(.1, .5, .3, 1)' }).onfinish = tidy;
+        };
+      };
+      setTimeout(tidy, 2600);
     }
   }  function projects() {
     var s = C.site;
