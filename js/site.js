@@ -324,6 +324,7 @@
         h('div', { class: 'links' },
           link('Linkedin', s.linkedin), link('Facebook', s.facebook), link('Instagram', s.instagram),
           h('a', { href: 'mailto:' + s.email, text: s.email }),
+          h('a', { href: 'privacy.html', text: 'Privacy & cookies' }),
           h('div', { class: 'copy', text: s.copyright }))),
       h('div', { class: 'bars' }, CATS.map(function (c, i) {
         return h('a', { class: 'b' + (i + 1), href: 'projects.html#' + c, 'aria-label': s.roles[i] + ' projects' });
@@ -385,8 +386,9 @@
     function step(t) {
       // where the blob wants to be: the middle if it is parked, the pointer if that is over the cover,
       // otherwise a wandering path of its own
-      var tx = parked ? W * 0.5 : ptr.on ? ptr.x : W * (0.5 + 0.3 * Math.sin(t * 0.41) + 0.1 * Math.sin(t * 1.07 + 1));
-      var ty = parked ? H * 0.5 : ptr.on ? ptr.y : H * (0.52 + 0.2 * Math.sin(t * 0.53 + 2) + 0.07 * Math.cos(t * 0.93));
+      // (on a phone, the way it is being tilted takes the place of the pointer: the liquid runs to the low side)
+      var tx = parked ? W * 0.5 : ptr.on ? ptr.x : tilt.on ? W * (0.5 + tilt.x * 0.32) + S * 0.03 * Math.sin(t * 1.3) : W * (0.5 + 0.3 * Math.sin(t * 0.41) + 0.1 * Math.sin(t * 1.07 + 1));
+      var ty = parked ? H * 0.5 : ptr.on ? ptr.y : tilt.on ? H * (0.5 + tilt.y * 0.34) + S * 0.03 * Math.cos(t * 1.1) : H * (0.52 + 0.2 * Math.sin(t * 0.53 + 2) + 0.07 * Math.cos(t * 0.93));
       ty = Math.min(floorY - S * 0.17, Math.max(topY, ty));
       mid.vx = (mid.vx + (tx - mid.x) * 0.02) * 0.9; mid.vy = (mid.vy + (ty - mid.y) * 0.02) * 0.9;
       mid.x += mid.vx; mid.y += mid.vy;
@@ -482,8 +484,32 @@
     }
     window.addEventListener('pointermove', function (e) { if (!e.pointerType || e.pointerType === 'mouse') point(e); }, { passive: true });
     // One click or tap parks the liquid in the middle; the next sets it loose again, heading for where you clicked.
+    // Tilt: a phone reports how it is being held. Leaning it left or right, or standing it up or laying it
+    // back, slides the liquid that way. The angle it is held at when this starts counts as level. iPhones
+    // only share this after asking, and only in answer to a tap, so the first tap anywhere does the asking.
+    var tilt = { on: false, x: 0, y: 0, base: null }, asked = false, justAsked = false;
+    function lean(e) {
+      if (e.gamma === null || e.beta === null) return;
+      if (tilt.base === null) tilt.base = e.beta;
+      var gx = Math.max(-1, Math.min(1, e.gamma / 28)), gy = Math.max(-1, Math.min(1, (e.beta - tilt.base) / 28));
+      tilt.x += (gx - tilt.x) * 0.2; tilt.y += (gy - tilt.y) * 0.2; // smoothed, so a shaky hand does not make it jitter
+      tilt.on = true;
+    }
+    function listen() { window.addEventListener('deviceorientation', lean, { passive: true }); }
+    var touchy = window.matchMedia('(hover: none) and (pointer: coarse)').matches, DOE = window.DeviceOrientationEvent;
+    if (touchy && DOE && !still) {
+      if (typeof DOE.requestPermission === 'function') {
+        document.addEventListener('click', function ask() {
+          if (asked) return;
+          asked = true; justAsked = true; setTimeout(function () { justAsked = false; }, 0);
+          document.removeEventListener('click', ask, true);
+          try { DOE.requestPermission().then(function (ans) { if (ans === 'granted') listen(); }, function () {}); } catch (err) {}
+        }, true);
+      } else listen();
+    }
     hero.addEventListener('click', function (e) {
       if (e.target.closest && e.target.closest('a, button, .nav')) return;
+      if (justAsked) return; // that tap was spent on asking to use the tilt sensor
       parked = !parked;
       beat = 1; nextBeat = sim + 0.9;
       if (!parked) { point(e); if (e.pointerType && e.pointerType !== 'mouse') setTimeout(function () { ptr.on = false; }, 1600); } // after a tap it wanders off again
@@ -1145,6 +1171,53 @@
     }
   }
 
+  /* ---------- privacy and cookies ---------- */
+  // What this page says has to stay true to what the site actually does. If the site starts collecting
+  // anything new (analytics, a newsletter, adverts), this page must change with it.
+  function privacy() {
+    var s = C.site, mail = h('a', { href: 'mailto:' + s.email, text: s.email });
+    function block(title) { return h('section', null, h('h2', { text: title }), Array.prototype.slice.call(arguments, 1)); }
+    function p() { return h('p', null, Array.prototype.slice.call(arguments)); }
+    function list(items) { return h('ul', null, items.map(function (i) { return h('li', null, i); })); }
+    app.append(nav(), h('h1', { class: 'chead', text: 'Privacy & cookies' }),
+      h('div', { class: 'policy' },
+        p('This is the personal portfolio of ' + s.cardName + '. It is a small site and it collects very little. This page explains what it does collect, what it keeps on your device, and how to reach me about any of it.'),
+        block('What I collect',
+          p(h('b', { text: 'Messages you send me.' }), ' If you use the form on the Contact page, I receive the name, email address and message you type. I use them only to read and answer your message. I do not sell them, share them or add you to any mailing list.'),
+          p(h('b', { text: 'Nothing else about you.' }), ' The site has no analytics, no advertising and no tracking. I do not know who visits or what they look at.')),
+        block('Cookies and what is kept on your device',
+          p('This site does not set any advertising or tracking cookies. It does keep a few small notes in your own browser so that it works properly:'),
+          list([
+            'that you have already seen the opening greeting, so it does not replay on every page (cleared when you close the tab)',
+            'that you have accepted the cookie notice, so it does not keep coming back'
+          ]),
+          p('These stay on your device. They are not sent to me or to anyone else, and you can remove them at any time by clearing this site’s data in your browser settings.')),
+
+        block('Other companies involved',
+          list([
+            'Hosting: the site is served by Vercel, which keeps standard technical logs (such as IP address and browser type) to run and protect the service. Messages from the contact form are stored in private storage there.',
+            'Fonts: the lettering is loaded from Google Fonts, so your browser contacts Google to fetch it.'
+          ])),
+        block('Your choices',
+          p('You can ask me what I hold from a message you sent, ask me to correct it, or ask me to delete it. Write to ', mail, ' and I will deal with it.')),
+        block('Changes',
+          p('If the site starts doing anything new with personal information, this page will be updated first. Last updated ' + new Date(2026, 10, 28).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + '.'))),
+      footer(), toTop());
+  }
+  // A short, one-time notice. There is nothing to accept or refuse, because the site sets no tracking
+  // cookies; it only says so, links to the full page, and goes away for good once closed.
+  function cookieNote() {
+    try { if (localStorage.getItem('cookieNote') === '1') return; } catch (e) { return; }
+    if (page === 'privacy') return;
+    var bar = h('div', { class: 'cookie-note', role: 'region', 'aria-label': 'Cookie notice' },
+      h('p', null, 'This site uses no tracking cookies. It only keeps a few notes in your browser so it works properly. ', h('a', { href: 'privacy.html', text: 'Privacy & cookies' })),
+      h('button', { class: 'btn', type: 'button', text: 'Accept', onclick: function () {
+        try { localStorage.setItem('cookieNote', '1'); } catch (e) {}
+        bar.classList.add('out'); setTimeout(function () { bar.remove(); }, 300);
+      } }));
+    document.body.appendChild(bar);
+  }
+
   /* ---------- contact ---------- */
   // The calling card has two sides. The front is the card itself; "Message me" turns it over to a short
   // form on the back. Whatever is sent lands in the admin's Messages page.
@@ -1254,7 +1327,8 @@
 
   Store.load().then(function (content) {
     C = content;
-    ({ home: home, about: about, projects: projects, contact: contact })[page]();
+    ({ home: home, about: about, projects: projects, contact: contact, privacy: privacy })[page]();
+    cookieNote();
     animate();
   });
 })();
