@@ -712,3 +712,9 @@ html.locked, html.locked body { overflow: hidden; }
 .cookie-note a { color: #fff; text-underline-offset: 3px; white-space: nowrap; }
 .cookie-note .btn { flex: none; padding: 7px 16px; font-size: 13px; background: #fff; color: #000; border-color: #fff; }
 @media (max-width: 760px) { .cookie-note { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); } } /* sits above the phone menu */
+/* ===== version 43: the portfolio is one scrolling page: cover, about, projects, contact ===== */
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+.contact-sec { padding-top: clamp(40px, 6vw, 110px); scroll-margin-top: 0; }
+.phero { scroll-margin-top: 0; }
+/* on a phone the flower in the menu already takes you to the top, so the separate back-to-top button is not needed (and it sat on the category links) */
+@media (max-width: 760px) { .totop { display: none; } }

@@ -57,9 +57,13 @@
     setTimeout(update, 200);
   }
 
+  // The address of a section of the home page, from wherever we are.
+  function there(id) { return (page === 'home' ? '' : 'index.html') + '#' + id; }
+
   function nav() {
-    // About is not a page of its own: it is the section straight under the cover on the home page.
-    var items = [['about', 'index.html#about'], ['projects', 'projects.html'], ['contact', 'contact.html']];
+    // The whole portfolio is one page: cover, about, projects, contact, in that order. The menu does not
+    // load anything; it glides to the section. From another page (privacy) it goes to that section of home.
+    var items = [['about', there('about')], ['projects', there('projects')], ['contact', there('contact')]];
     // On a phone the menu is a floating glass bar of icons along the bottom, with Home as its first item.
     // On wider screens the icons are hidden and the words show instead. The icons are drawn in the
     // text colour, so they flip to white over dark parts of the page just as the words do.
@@ -80,30 +84,31 @@
     contrastNav(el);
     waterDrop(glass);
     if (page === 'home') {
-      // On the home page, Home and About glide up and down the same page instead of loading anything, and
-      // the menu marks whichever of the two you are looking at.
-      var homeA = glass.querySelector('li.m-only a'), aboutA = glass.querySelector('a[href$="#about"]'), inAbout = null;
+      // On the home page the menu follows you: it marks whichever section you have scrolled to, and a
+      // click glides there instead of jumping.
+      var links = { home: glass.querySelector('li.m-only a') }, now = null;
       var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+      items.forEach(function (i) { links[i[0]] = glass.querySelector('a[href$="#' + i[0] + '"]'); });
       var spy = function () {
-        var sec = document.getElementById('about');
-        if (!sec) return;
-        var now = sec.getBoundingClientRect().top < window.innerHeight * 0.55;
-        if (now === inAbout) return;
-        inAbout = now;
-        if (now) { aboutA.setAttribute('aria-current', 'true'); homeA.removeAttribute('aria-current'); } else { homeA.setAttribute('aria-current', 'page'); aboutA.removeAttribute('aria-current'); }
+        var cur = 'home', line = window.innerHeight * 0.55;
+        items.forEach(function (i) { var sec = document.getElementById(i[0]); if (sec && sec.getBoundingClientRect().top < line) cur = i[0]; });
+        if (cur === now) return;
+        now = cur;
+        Object.keys(links).forEach(function (k) { if (k === cur) links[k].setAttribute('aria-current', 'true'); else links[k].removeAttribute('aria-current'); });
         glass.dispatchEvent(new Event('navchange'));
       };
-      aboutA.addEventListener('click', function (e) {
-        var sec = document.getElementById('about');
-        if (!sec) return;
-        e.preventDefault(); sec.scrollIntoView({ behavior: calm, block: 'start' });
-        try { history.replaceState(null, '', '#about'); } catch (err) {}
+      Object.keys(links).forEach(function (k) {
+        links[k].addEventListener('click', function (e) {
+          var sec = k === 'home' ? null : document.getElementById(k);
+          if (k !== 'home' && !sec) return;
+          e.preventDefault();
+          if (sec) sec.scrollIntoView({ behavior: calm, block: 'start' }); else window.scrollTo({ top: 0, behavior: calm });
+          try { history.replaceState(null, '', sec ? '#' + k : location.pathname); } catch (err) {}
+        });
       });
-      homeA.addEventListener('click', function (e) { e.preventDefault(); window.scrollTo({ top: 0, behavior: calm }); try { history.replaceState(null, '', location.pathname); } catch (err) {} });
       window.addEventListener('scroll', spy, { passive: true });
       setTimeout(spy, 0);
-    }
-    return el;
+    }    return el;
   }
 
   // The links sit in a pill of glass. A drop of water rests on the current page and runs to whichever link is
@@ -236,7 +241,7 @@
   function aboutBlock(open) {
     var s = C.site;
     var roles = h('div', { class: 'roles', id: 'roles', hidden: !open }, s.roles.map(function (name, i) {
-      return h('a', { class: 'role', href: 'projects.html#' + CATS[i] },
+      return h('a', { class: 'role', href: there(CATS[i]) },
         h('span', { class: 'fwrap', style: 'display:block' }, folder(SHADES[i]), h('span', { class: 'num', text: '0' + (i + 1) })),
         name);
     }));
@@ -327,7 +332,7 @@
           h('a', { href: 'privacy.html', text: 'Privacy & cookies' }),
           h('div', { class: 'copy', text: s.copyright }))),
       h('div', { class: 'bars' }, CATS.map(function (c, i) {
-        return h('a', { class: 'b' + (i + 1), href: 'projects.html#' + c, 'aria-label': s.roles[i] + ' projects' });
+        return h('a', { class: 'b' + (i + 1), href: there(c), 'aria-label': s.roles[i] + ' projects' });
       })));
   }
 
@@ -766,10 +771,11 @@
             h('img', { src: 'assets/portfolio-wordmark.png', alt: 'Portfolio' }),
             s.roles.map(function (r, i) { return h('span', { class: 'tag t' + (i + 1), text: '( ' + (i + 1) + ' )' + r }); }))),
         h('div', { class: 'hero-foot' }, clock));
-    app.append(hero, marquee(), aboutBlock(false), footer(), toTop());
+    // One page, top to bottom: cover, about, projects, contact.
+    [hero, marquee(), aboutBlock(false)].concat(projectsParts(), [contactPart(), footer(), toTop()]).forEach(function (part) { app.appendChild(part); });
     flow = ferro(hero);
-    // arriving from another page's About link: go straight down to the section
-    if (location.hash === '#about') setTimeout(function () { var sec = document.getElementById('about'); if (sec) sec.scrollIntoView(); }, 80);
+    // arriving with a section in the address (from an old link, or the privacy page): go straight down to it
+    if (location.hash.length > 1) setTimeout(function () { var sec = document.getElementById(location.hash.slice(1)); if (sec) sec.scrollIntoView(); }, 120);
     var fluid = liquid(hero, hero.querySelector('.mark'));
     if (seen) { flow.start(); fluid.assemble(); }
   }
@@ -1146,29 +1152,28 @@
       };
       setTimeout(tidy, 2600);
     }
-  }  function projects() {
-    var s = C.site;
+  }
+  // The projects part of the page: its own full-screen cover with the drifting tool icons and the four
+  // category links, then one section per category.
+  function projectsParts() {
+    var s = C.site, parts = [];
     var render = { graphic: graphic, video: video, uiux: uiux, developer: developer };
     var flow = heroIcons(); // the tool icons drift across behind the title
-    app.append(h('header', { class: 'phero' }, flow.back, nav(), h('div', { class: 'pmid' }, h('h1', { class: 'ptitle', text: s.projectsTitle })),
+    parts.push(h('header', { class: 'phero', id: 'projects' }, flow.back, h('div', { class: 'pmid' }, h('h2', { class: 'ptitle', text: s.projectsTitle })),
       h('nav', { class: 'catnav', 'aria-label': 'Project categories' }, CATS.map(function (c, i) {
         return h('a', { href: '#' + c }, s.roles[i], h('span', { class: 'arrow' }, UI.arrow('down')), h('span', { class: 'bar b' + (i + 1) }));
       }))));
-    flow.start();
+    setTimeout(function () { flow.start(); }, 0); // once it is on the page and has a size
     CATS.forEach(function (c, i) {
       var list = byCat(c);
       var body;
       if (c === 'uiux') body = uiux(list, s.roles[i]);
       else if (!list.length && c !== 'developer') body = h('p', { class: 'empty', text: 'New work coming soon.' });
       else body = render[c](list);
-      app.append(h('section', { class: 'section' + (c === 'developer' ? ' dev' : ''), id: c },
-        c === 'uiux' ? h('h2', { class: 'sr-only', text: s.roles[i] }) : h('h2', { text: s.roles[i] }), body));
+      parts.push(h('section', { class: 'section' + (c === 'developer' ? ' dev' : ''), id: c },
+        c === 'uiux' ? h('h3', { class: 'sr-only', text: s.roles[i] }) : h('h2', { text: s.roles[i] }), body));
     });
-    app.append(footer(), toTop());
-    if (location.hash) {
-      var t = document.getElementById(location.hash.slice(1));
-      if (t) setTimeout(function () { t.scrollIntoView(); }, 60);
-    }
+    return parts;
   }
 
   /* ---------- privacy and cookies ---------- */
@@ -1296,11 +1301,10 @@
     return wrap;
   }
 
-  function contact() {
+  function contactPart() {
     var s = C.site;
-    app.append(nav(), h('h1', { class: 'chead', text: s.contactHeading }),
-      h('div', { class: 'contact-page' }, callingCard(s)),
-      footer(), toTop());
+    return h('section', { class: 'contact-sec', id: 'contact' }, h('h2', { class: 'chead', text: s.contactHeading }),
+      h('div', { class: 'contact-page' }, callingCard(s)));
   }
   // Elements ease into place as they scroll into view.
   function animate() {
@@ -1327,7 +1331,7 @@
 
   Store.load().then(function (content) {
     C = content;
-    ({ home: home, about: about, projects: projects, contact: contact, privacy: privacy })[page]();
+    ({ home: home, about: about, privacy: privacy })[page]();
     cookieNote();
     animate();
   });
