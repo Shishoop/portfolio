@@ -3,7 +3,7 @@
 // the style of braille text art, with a line of handwriting underneath, made of the same dots.
 (function () {
   var LOVE = ['I love you', 'Te amo', 'Je t’aime', 'Ti amo', 'Ich liebe dich', '愛してる', '사랑해', '我爱你', 'Eu te amo', 'Mahal kita'];
-  var LINE = 'you are as beautiful as your favorite flower';
+  var LINE = 'you are as beautiful as your favourite flower', SIGNED = '- narci'; // the signature always gets a line of its own
   var TAU = Math.PI * 2;
   var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -98,6 +98,7 @@
       if (cur && m.measureText(next).width > W * 0.9) { lines.push(cur); cur = w; } else cur = next;
     });
     if (cur) lines.push(cur);
+    lines.push(SIGNED);
     var textH = lines.length * lineH + fpx * 0.35;
     textTop = H - textH - ch;
     var tw = DW, thh = Math.ceil(textH / hy) + 2, y0 = Math.floor(textTop / hy);
