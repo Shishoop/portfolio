@@ -58,14 +58,148 @@
   }
 
   function nav() {
-    var items = [['about', 'about.html'], ['projects', 'projects.html'], ['contact', 'contact.html']];
+    // About is not a page of its own: it is the section straight under the cover on the home page.
+    var items = [['about', 'index.html#about'], ['projects', 'projects.html'], ['contact', 'contact.html']];
+    // On a phone the menu is a floating glass bar of icons along the bottom, with Home as its first item.
+    // On wider screens the icons are hidden and the words show instead. The icons are drawn in the
+    // text colour, so they flip to white over dark parts of the page just as the words do.
+    var ICONS = {
+      about: '<circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5v-1.2c0-3 3.2-5 7.5-5s7.5 2 7.5 5v1.2"/>',
+      projects: '<path d="M2.5 5.5h6.8l2.4 2.6h9.8v11.4h-19z"/>',
+      contact: '<path d="M2.5 5.5h19v13h-19z"/><path d="M2.8 6l9.2 7 9.2-7"/>'
+    };
+    function item(name, href, current) {
+      var ico = h('span', { class: 'ico' + (name === 'home' ? ' flower' : ''), 'aria-hidden': 'true' });
+      if (ICONS[name]) ico.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" stroke-linecap="square">' + ICONS[name] + '</svg>';
+      return h('li', { class: name === 'home' ? 'm-only' : null }, h('a', { href: href, 'aria-current': current ? 'page' : null }, ico, h('span', { class: 'lab', text: name })));
+    }
+    var glass = h('div', { class: 'glass' }, h('ul', null, item('home', 'index.html', page === 'home'), items.map(function (i) { return item(i[0], i[1], page === i[0]); })));
     var el = h('nav', { class: 'nav', 'aria-label': 'Main' },
       page === 'home' ? h('span') : h('a', { class: 'home', href: 'index.html', 'aria-label': 'Home' }, h('img', { src: 'assets/flower.png', alt: '' })),
-      h('ul', null, items.map(function (i) {
-        return h('li', null, h('a', { href: i[1], 'aria-current': page === i[0] ? 'page' : null, text: i[0] }));
-      })));
+      glass);
     contrastNav(el);
+    waterDrop(glass);
+    if (page === 'home') {
+      // On the home page, Home and About glide up and down the same page instead of loading anything, and
+      // the menu marks whichever of the two you are looking at.
+      var homeA = glass.querySelector('li.m-only a'), aboutA = glass.querySelector('a[href$="#about"]'), inAbout = null;
+      var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+      var spy = function () {
+        var sec = document.getElementById('about');
+        if (!sec) return;
+        var now = sec.getBoundingClientRect().top < window.innerHeight * 0.55;
+        if (now === inAbout) return;
+        inAbout = now;
+        if (now) { aboutA.setAttribute('aria-current', 'true'); homeA.removeAttribute('aria-current'); } else { homeA.setAttribute('aria-current', 'page'); aboutA.removeAttribute('aria-current'); }
+        glass.dispatchEvent(new Event('navchange'));
+      };
+      aboutA.addEventListener('click', function (e) {
+        var sec = document.getElementById('about');
+        if (!sec) return;
+        e.preventDefault(); sec.scrollIntoView({ behavior: calm, block: 'start' });
+        try { history.replaceState(null, '', '#about'); } catch (err) {}
+      });
+      homeA.addEventListener('click', function (e) { e.preventDefault(); window.scrollTo({ top: 0, behavior: calm }); try { history.replaceState(null, '', location.pathname); } catch (err) {} });
+      window.addEventListener('scroll', spy, { passive: true });
+      setTimeout(spy, 0);
+    }
     return el;
+  }
+
+  // The links sit in a pill of glass. A drop of water rests on the current page and runs to whichever link is
+  // pointed at: its front edge leaves first so it stretches, two droplets break off and catch up, and it
+  // lands with a ripple. The goo filter is what makes the drop and droplets merge like liquid.
+  function waterDrop(glass) {
+    if (!document.getElementById('goo')) {
+      var svg = h('div', { 'aria-hidden': 'true', style: 'position:absolute;width:0;height:0;overflow:hidden' });
+      svg.innerHTML = '<svg width="0" height="0"><filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="4"/>' +
+        '<feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9"/></filter></svg>';
+      document.body.appendChild(svg);
+    }
+    var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var drop = h('i', { class: 'drop' }), drops = h('span', { class: 'drops' }, drop);
+    var wrap = h('span', { class: 'dropwrap', 'aria-hidden': 'true' }, drops);
+    glass.insertBefore(wrap, glass.firstChild);
+    var home = null, at = null, phone = window.matchMedia('(max-width: 760px)');
+    function seen() { var marked = glass.querySelector('a[aria-current]'); home = marked && marked.offsetWidth ? marked : null; return home; } // the Home item only exists on a phone
+    // Each edge of the drop is on its own spring, so it glides instead of snapping, can change its mind
+    // mid-way without a jump, and the back edge trails the front one (that is the stretch).
+    var cur = null, tgt = null, vl = 0, vr = 0, raf = 0, last = 0, busy = false;
+
+    function box(a) {
+      var g = glass.getBoundingClientRect(), r = a.getBoundingClientRect(), pad = phone.matches ? 2 : r.height * 0.6;
+      return { l: r.left - g.left - pad, r: g.right - r.right - pad };
+    }
+    function paint() { drop.style.left = cur.l.toFixed(2) + 'px'; drop.style.right = cur.r.toFixed(2) + 'px'; }
+    function spring(x, v, to, w, dt) { // critically damped: no overshoot, no wobble
+      var acc = w * w * (to - x) - 2 * w * v;
+      v += acc * dt;
+      return [x + v * dt, v];
+    }
+    function frame(now) {
+      var dt = Math.min((now - last) / 1000, 0.034), right = tgt.l > cur.l, s;
+      last = now;
+      for (var i = 0; i < 2; i++) { // two half steps keep the spring steady on slow frames
+        s = spring(cur.l, vl, tgt.l, right ? 11 : 19, dt / 2); cur.l = s[0]; vl = s[1];
+        s = spring(cur.r, vr, tgt.r, right ? 19 : 11, dt / 2); cur.r = s[0]; vr = s[1];
+      }
+      if (Math.abs(tgt.l - cur.l) + Math.abs(tgt.r - cur.r) < 0.4 && Math.abs(vl) + Math.abs(vr) < 4) {
+        cur = { l: tgt.l, r: tgt.r }; vl = vr = 0; raf = 0;
+        paint();
+        ripple();
+        return;
+      }
+      paint();
+      raf = requestAnimationFrame(frame);
+    }
+    // one droplet breaks off the back of the drop and catches up; never more than one at a time
+    function droplet(fromMid, toMid) {
+      if (busy || Math.abs(toMid - fromMid) < 30) return;
+      busy = true;
+      var size = glass.clientHeight * 0.34;
+      var bead = h('i', { class: 'bead', style: 'width:' + size + 'px;height:' + size + 'px;margin:' + (-size / 2) + 'px 0 0 ' + (-size / 2) + 'px;left:' + fromMid + 'px' });
+      var end = function () { bead.remove(); busy = false; };
+      drops.appendChild(bead);
+      bead.animate([{ transform: 'translateX(0) scale(1)' }, { transform: 'translateX(' + (toMid - fromMid) + 'px) scale(.6)' }],
+        { duration: 620, delay: 90, easing: 'cubic-bezier(.45, 0, .2, 1)', fill: 'both' }).onfinish = end;
+      setTimeout(end, 1200);
+    }
+    function ripple() {
+      var ring = h('i', { class: 'ring', style: 'left:' + cur.l + 'px;right:' + cur.r + 'px' });
+      wrap.parentNode.insertBefore(ring, wrap.nextSibling);
+      ring.animate([{ transform: 'scale(1)', opacity: 0.55 }, { transform: 'scale(1.18, 1.35)', opacity: 0 }],
+        { duration: 700, easing: 'cubic-bezier(.2, .6, .3, 1)', fill: 'both' }).onfinish = function () { ring.remove(); };
+      setTimeout(function () { ring.remove(); }, 1400);
+    }
+    function go(a, instant) {
+      if (!a) { wrap.classList.remove('show'); at = null; return; }
+      if (a === at && !instant) return;
+      var to = box(a), fresh = !at || !cur;
+      at = a;
+      wrap.classList.add('show');
+      if (instant || still || fresh) {
+        cancelAnimationFrame(raf); raf = 0;
+        cur = to; tgt = to; vl = vr = 0;
+        paint();
+        if (fresh && !instant && !still) drop.animate([{ transform: 'scale(.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 520, easing: 'cubic-bezier(.2, .8, .2, 1)' });
+        return;
+      }
+      var w = glass.clientWidth;
+      droplet((cur.l + w - cur.r) / 2, (to.l + w - to.r) / 2);
+      tgt = to;
+      if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); }
+    }
+    Array.prototype.forEach.call(glass.querySelectorAll('a'), function (a) {
+      a.addEventListener('pointerenter', function () { go(a); });
+      a.addEventListener('focus', function () { go(a); });
+      a.addEventListener('blur', function () { go(home); });
+    });
+    glass.addEventListener('pointerleave', function () { go(home); });
+    function rest() { seen(); if (at && !at.offsetWidth) at = null; if (at || home) go(at || home, true); else go(null); }
+    window.addEventListener('resize', rest);
+    glass.addEventListener('navchange', function () { seen(); at = null; go(home); }); // the current page mark moved: let the drop flow to it
+    setTimeout(rest, 0);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(rest);
   }
 
   function marquee() {
@@ -142,7 +276,7 @@
     }
     return h('div', { class: 'tools-flow', 'aria-label': 'Tools I use' }, h('div', { class: 'tools-track' }, set(false), set(true)));
   }
-  // Cover icons: each tool is ONE element, so it can never be on screen twice. Every pass it picks a new
+  // Drifting icons (on the Projects cover): each tool is ONE element, so it can never be on screen twice. Every pass it picks a new
   // height, size, speed and depth, sometimes crossing in front of the logo and sometimes behind it.
   function heroIcons() {
     var back = h('div', { class: 'hero-flow back', 'aria-hidden': 'true' });
@@ -206,6 +340,168 @@
     window.addEventListener('scroll', place, { passive: true });
     place();
     return b;
+  }
+
+  // Cover liquid: a blob of black magnetic fluid, like the ferrofluid in a visualiser speaker. It is a handful
+  // of soft balls that merge wherever they touch. The big ones churn round each other and pulse; the small
+  // ones lag behind, so the blob stretches, sheds droplets and swallows them again; and every second or so
+  // it "beats", throwing out a ring of spikes the way real ferrofluid does near a magnet. It wanders on its
+  // own, and while the mouse is over the cover it is drawn to the pointer. A click or tap on the cover
+  // parks it in the middle, where it stays (still churning) until the next click sets it loose again.
+  function ferro(hero) {
+    var canvas = h('canvas', { class: 'ferro', 'aria-hidden': 'true' }), ctx = canvas.getContext('2d');
+    var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var W = 0, H = 0, S = 0, dpr = 1, G = 8, cols = 0, rows = 0, field = null, balls = [], raf = 0, born = 0, seen = true, topY = 0, navY = 0;
+    var mid = { x: 0, y: 0, vx: 0, vy: 0 }, ptr = { x: 0, y: 0, on: false }, parked = false, floorY = 1e9, beat = 0, nextBeat = 0, lastT = 0, sim = 0, acc = 0, prev = 0;
+    hero.insertBefore(canvas, hero.firstChild);
+    function rnd(a, b) { return a + Math.random() * (b - a); }
+    function size() {
+      var r = hero.getBoundingClientRect();
+      W = r.width; H = r.height; S = Math.min(W, H);
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+      G = Math.max(4, Math.round(S / 150));
+      cols = Math.ceil(W / G) + 1; rows = Math.ceil(H / G) + 1;
+      field = new Float32Array(cols * rows);
+      // keep the liquid clear of the menu, whether the menu sits along the top or (on a phone) the bottom
+      var navEl = hero.querySelector('.nav .glass'), nr = navEl ? navEl.getBoundingClientRect() : null;
+      navY = 0; floorY = 1e9;
+      if (nr && nr.top - r.top > H / 2) floorY = nr.top - r.top - 10; else if (nr) navY = nr.bottom - r.top + 10;
+      topY = navY + S * 0.17;
+      if (!balls.length) {
+        mid.x = W * 0.5; mid.y = H * 0.55;
+        for (var i = 0; i < 26; i++) {
+          // six big balls make the body, ten droplets trail it, ten "spikes" wait inside for each beat
+          var kind = i < 6 ? 0 : i < 16 ? 1 : 2;
+          balls.push({ kind: kind, big: kind === 0,
+            r: kind === 0 ? rnd(0.036, 0.062) : kind === 1 ? rnd(0.009, 0.024) : rnd(0.013, 0.022),
+            reach: kind === 0 ? rnd(0.04, 0.13) : kind === 1 ? rnd(0.12, 0.3) : rnd(0.03, 0.06),
+            k: kind === 0 ? rnd(0.03, 0.07) : kind === 1 ? rnd(0.006, 0.02) : rnd(0.06, 0.1),
+            f: kind === 1 ? rnd(0.5, 1.6) : rnd(0.9, 2.3), g: kind === 1 ? rnd(0.5, 1.6) : rnd(0.9, 2.3), p: rnd(0, 6.3), q: rnd(0, 6.3),
+            a: (i - 16) / 10 * 6.283 + rnd(-0.2, 0.2), x: mid.x, y: mid.y, vx: 0, vy: 0 });
+        }
+      }
+    }
+    function step(t) {
+      // where the blob wants to be: the middle if it is parked, the pointer if that is over the cover,
+      // otherwise a wandering path of its own
+      var tx = parked ? W * 0.5 : ptr.on ? ptr.x : W * (0.5 + 0.3 * Math.sin(t * 0.41) + 0.1 * Math.sin(t * 1.07 + 1));
+      var ty = parked ? H * 0.5 : ptr.on ? ptr.y : H * (0.52 + 0.2 * Math.sin(t * 0.53 + 2) + 0.07 * Math.cos(t * 0.93));
+      ty = Math.min(floorY - S * 0.17, Math.max(topY, ty));
+      mid.vx = (mid.vx + (tx - mid.x) * 0.02) * 0.9; mid.vy = (mid.vy + (ty - mid.y) * 0.02) * 0.9;
+      mid.x += mid.vx; mid.y += mid.vy;
+      // the beat: at uneven intervals everything is kicked outward and the spikes shoot out, then it all settles
+      var dt = Math.min(0.05, Math.max(0, t - lastT)), kick = false;
+      lastT = t; beat *= Math.pow(0.02, dt);
+      if (t > nextBeat) { nextBeat = t + rnd(0.7, 1.7); beat = 1; kick = true; }
+      var turn = t * 0.9; // the body slowly churns round its own middle
+      for (var i = 0; i < balls.length; i++) {
+        var b = balls[i], ax, ay;
+        if (b.kind === 2) { // a spike: tucked inside the body, thrown outward on the beat
+          var out = (b.reach + beat * 0.15) * S, an = b.a + turn * 0.6;
+          ax = mid.x + Math.cos(an) * out; ay = mid.y + Math.sin(an) * out;
+        } else {
+          var c = Math.cos(turn * (b.kind ? 0.4 : 1)), s = Math.sin(turn * (b.kind ? 0.4 : 1));
+          var ox = Math.cos(t * b.f + b.p) * b.reach * S, oy = Math.sin(t * b.g + b.q) * b.reach * S;
+          ax = mid.x + ox * c - oy * s; ay = mid.y + ox * s + oy * c;
+        }
+        if (kick && b.kind !== 2) { var kx = b.x - mid.x, ky = b.y - mid.y, kl = Math.sqrt(kx * kx + ky * ky) || 1; b.vx += kx / kl * S * 0.012; b.vy += ky / kl * S * 0.012; }
+        b.vx = (b.vx + (ax - b.x) * b.k) * 0.9; b.vy = (b.vy + (ay - b.y) * b.k) * 0.9;
+        b.x += b.vx; b.y += b.vy;
+        var rr = b.r * S * 1.2, roof = navY + rr, fl = floorY - rr; // droplets bounce off an invisible line beside the menu
+        if (b.y < roof) { b.y = roof; b.vy = Math.abs(b.vy) * 0.3; }
+        if (b.y > fl) { b.y = fl; b.vy = -Math.abs(b.vy) * 0.3; }
+      }
+    }
+    function draw(t) {
+      var grow = still ? 1 : Math.min(1, (t - born) / 1.6), i, j, n;
+      grow = 1 - Math.pow(1 - grow, 3);
+      field.fill(0);
+      for (n = 0; n < balls.length; n++) {
+        var b = balls[n], rr = b.r * S * grow * (b.big ? 1 + 0.16 * Math.sin(t * 3.4 + b.p) + beat * 0.12 : 1), r2 = rr * rr;
+        // a ball only matters near itself, so only that patch of the grid is touched
+        var reach = rr * 5, i0 = Math.max(0, Math.floor((b.x - reach) / G)), i1 = Math.min(cols - 1, Math.ceil((b.x + reach) / G));
+        var j0 = Math.max(0, Math.floor((b.y - reach) / G)), j1 = Math.min(rows - 1, Math.ceil((b.y + reach) / G));
+        for (j = j0; j <= j1; j++) for (i = i0; i <= i1; i++) {
+          var dx = i * G - b.x, dy = j * G - b.y;
+          field[j * cols + i] += r2 / (dx * dx + dy * dy + 0.01);
+        }
+      }
+      // trace the edge of the liquid: everywhere the balls add up to 1 or more is inside
+      var path = new Path2D();
+      for (j = 0; j < rows - 1; j++) {
+        var run = -1;
+        for (i = 0; i < cols - 1; i++) {
+          var a = field[j * cols + i], bb = field[j * cols + i + 1], c = field[(j + 1) * cols + i + 1], d = field[(j + 1) * cols + i];
+          var A = a >= 1, B = bb >= 1, C = c >= 1, D = d >= 1;
+          if (A && B && C && D) { if (run < 0) run = i; continue; }
+          if (run >= 0) { path.rect(run * G, j * G, (i - run) * G, G); run = -1; }
+          if (!A && !B && !C && !D) continue;
+          var x0 = i * G, y0 = j * G, pts = [];
+          if (A) pts.push(x0, y0);
+          if (A !== B) pts.push(x0 + G * (1 - a) / (bb - a), y0);
+          if (B) pts.push(x0 + G, y0);
+          if (B !== C) pts.push(x0 + G, y0 + G * (1 - bb) / (c - bb));
+          if (C) pts.push(x0 + G, y0 + G);
+          if (C !== D) pts.push(x0 + G * (1 - d) / (c - d), y0 + G);
+          if (D) pts.push(x0, y0 + G);
+          if (D !== A) pts.push(x0, y0 + G * (1 - a) / (d - a));
+          path.moveTo(pts[0], pts[1]);
+          for (n = 2; n < pts.length; n += 2) path.lineTo(pts[n], pts[n + 1]);
+          path.closePath();
+        }
+        if (run >= 0) path.rect(run * G, j * G, (cols - 1 - run) * G, G);
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#000';
+      ctx.fill(path);
+      // a soft sheen, so it reads as wet rather than flat
+      ctx.save(); ctx.clip(path);
+      var sx = mid.x - S * 0.04, sy = mid.y - S * 0.06, gl = ctx.createRadialGradient(sx, sy, 0, sx, sy, S * 0.13);
+      gl.addColorStop(0, 'rgba(255,255,255,.2)'); gl.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = gl; ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+    function frame(now) {
+      raf = 0;
+      if (!seen || document.hidden) return;
+      // The motion is worked out in fixed 1/60 second steps, however often the screen redraws, so the
+      // liquid moves at the same speed on a slow laptop and on a 120 Hz phone.
+      var t = now / 1000, guard = 0;
+      acc += Math.min(0.2, prev ? t - prev : 0); prev = t;
+      while (acc >= 1 / 60 && guard++ < 10) { sim += 1 / 60; step(sim); acc -= 1 / 60; }
+      draw(t);
+      raf = requestAnimationFrame(frame);
+    }
+    function wake() { if (born && !raf && !still) { prev = 0; raf = requestAnimationFrame(frame); } }
+    function point(e) {
+      var r = hero.getBoundingClientRect();
+      ptr.x = e.clientX - r.left; ptr.y = e.clientY - r.top;
+      ptr.on = ptr.x >= 0 && ptr.y >= 0 && ptr.x <= r.width && ptr.y <= r.height;
+    }
+    window.addEventListener('pointermove', function (e) { if (!e.pointerType || e.pointerType === 'mouse') point(e); }, { passive: true });
+    // One click or tap parks the liquid in the middle; the next sets it loose again, heading for where you clicked.
+    hero.addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('a, button, .nav')) return;
+      parked = !parked;
+      beat = 1; nextBeat = sim + 0.9;
+      if (!parked) { point(e); if (e.pointerType && e.pointerType !== 'mouse') setTimeout(function () { ptr.on = false; }, 1600); } // after a tap it wanders off again
+    });
+    document.addEventListener('pointerleave', function () { ptr.on = false; });
+    document.addEventListener('visibilitychange', wake);
+    if (window.IntersectionObserver) new IntersectionObserver(function (en) { seen = en[0].isIntersecting; wake(); }).observe(hero);
+    var timer;
+    window.addEventListener('resize', function () { clearTimeout(timer); timer = setTimeout(function () { size(); if (still && born) draw(born + 9); }, 150); });
+    return {
+      start: function () {
+        size();
+        born = performance.now() / 1000;
+        canvas.classList.add('go');
+        if (still) { for (var i = 0; i < 400; i++) step(i / 30); draw(born + 9); return; }
+        wake();
+      }
+    };
   }
 
   // Liquid logo: the cover logo and its tags stay solid, but near the pointer they bend, stretch and wobble
@@ -359,11 +655,50 @@
     };
   }
   /* ---------- home ---------- */
+  // Sound effects are made in the browser, so there are no audio files to load. Browsers only allow
+  // sound after the visitor has clicked or tapped once, which the intro click takes care of.
+  var sfx = (function () {
+    var ctx = null;
+    function ac() {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (!A) return null;
+      try {
+        if (!ctx) ctx = new A();
+        if (ctx.state === 'suspended') ctx.resume();
+      } catch (e) { return null; }
+      return ctx;
+    }
+    function tone(from, to, dur, vol, type) {
+      var c = ac();
+      if (!c) return;
+      var o = c.createOscillator(), g = c.createGain(), t = c.currentTime;
+      o.type = type || 'sine';
+      o.frequency.setValueAtTime(from, t);
+      if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(c.destination);
+      o.start(t); o.stop(t + dur + 0.02);
+    }
+    var NOTES = [392, 440, 494, 587, 659, 784, 880, 988, 1175, 1319];
+    return {
+      // a short pixel-style blip for links and buttons
+      click: function () { tone(740, 430, 0.07, 0.05, 'square'); },
+      // each hello is one note, climbing a scale
+      hello: function (n) { tone(NOTES[n % NOTES.length], 0, 0.14, 0.08, 'triangle'); }
+    };
+  })();
+  document.addEventListener('pointerdown', function (e) {
+    var t = e.target;
+    if (!t || !t.closest || t.closest('.intro')) return; // the intro has its own sounds
+    if (t.closest('a, button, [role="button"], summary')) sfx.click();
+  }, true);
+
   var HELLOS = ['Hello', 'Hola', 'Bonjour', 'こんにちは', 'Hallo', '안녕하세요', 'Olá', '你好', 'Kumusta', 'Mabuhay'];
   function home() {
     var s = C.site;
-    var flow = heroIcons();
-    var seen = sessionStorage.getItem('introSeen');
+    var seen = sessionStorage.getItem('introSeen'), flow;
     if (!sessionStorage.getItem('introSeen')) {
       var intro = h('div', { class: 'intro', role: 'button', tabindex: '0', 'aria-label': 'Enter site' }, h('span', { text: s.introWord }));
       var leave = function (e) {
@@ -378,14 +713,15 @@
         word.classList.add('cycling');
         (function next() {
           if (n < hellos.length) {
+            sfx.hello(n);
             word.textContent = hellos[n++];
             setTimeout(next, n <= 2 ? 300 : n >= hellos.length ? 420 : 170);
             return;
           }
-          intro.classList.add('leave');
           flow.start();
           fluid.assemble();
-          setTimeout(function () { intro.remove(); }, 1200);
+          intro.classList.add('leave');
+          setTimeout(function () { intro.remove(); }, 1150);
         })();
       };
       intro.addEventListener('click', leave);
@@ -397,15 +733,17 @@
     var tick = function () { clock.textContent = 'current time: ' + new Date().toLocaleTimeString('en-GB'); };
     tick(); setInterval(tick, 1000);
     var hero = h('header', { class: 'hero' },
-        flow.back,
         nav(),
         h('div', { class: 'hero-mid' },
           h('div', { class: 'mark' },
             h('h1', { class: 'sr-only', text: 'Portfolio' }),
             h('img', { src: 'assets/portfolio-wordmark.png', alt: 'Portfolio' }),
             s.roles.map(function (r, i) { return h('span', { class: 'tag t' + (i + 1), text: '( ' + (i + 1) + ' )' + r }); }))),
-        h('div', { class: 'hero-foot' }, clock), flow.front);
+        h('div', { class: 'hero-foot' }, clock));
     app.append(hero, marquee(), aboutBlock(false), footer(), toTop());
+    flow = ferro(hero);
+    // arriving from another page's About link: go straight down to the section
+    if (location.hash === '#about') setTimeout(function () { var sec = document.getElementById('about'); if (sec) sec.scrollIntoView(); }, 80);
     var fluid = liquid(hero, hero.querySelector('.mark'));
     if (seen) { flow.start(); fluid.assemble(); }
   }
@@ -785,10 +1123,12 @@
   }  function projects() {
     var s = C.site;
     var render = { graphic: graphic, video: video, uiux: uiux, developer: developer };
-    app.append(h('header', { class: 'phero' }, nav(), h('div', { class: 'pmid' }, h('h1', { class: 'ptitle', text: s.projectsTitle })),
+    var flow = heroIcons(); // the tool icons drift across behind the title
+    app.append(h('header', { class: 'phero' }, flow.back, nav(), h('div', { class: 'pmid' }, h('h1', { class: 'ptitle', text: s.projectsTitle })),
       h('nav', { class: 'catnav', 'aria-label': 'Project categories' }, CATS.map(function (c, i) {
         return h('a', { href: '#' + c }, s.roles[i], h('span', { class: 'arrow' }, UI.arrow('down')), h('span', { class: 'bar b' + (i + 1) }));
       }))));
+    flow.start();
     CATS.forEach(function (c, i) {
       var list = byCat(c);
       var body;

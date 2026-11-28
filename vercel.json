@@ -9,6 +9,8 @@
   ],
   "routes": [
     { "handle": "filesystem" },
-    { "src": "/api/([^/.]+)", "dest": "/api/$1.js" }
+    { "src": "/api/([^/.]+)", "dest": "/api/$1.js" },
+    { "src": "/sofia/?", "dest": "/sofia.html" },
+    { "src": "/photobooth/?", "dest": "/photobooth.html" }
   ]
 }

@@ -13,6 +13,9 @@ try {
       $rel = [System.Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath).TrimStart('/')
       if ($rel -eq '') { $rel = 'index.html' }
       $path = [System.IO.Path]::GetFullPath((Join-Path $root $rel))
+      # a page can be opened without ".html", e.g. /sofia
+      $bare = $rel.TrimEnd('/')
+      if (-not (Test-Path $path -PathType Leaf) -and $bare -and -not [System.IO.Path]::GetExtension($bare)) { $path = [System.IO.Path]::GetFullPath((Join-Path $root "$bare.html")) }
       if ($path.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase) -and (Test-Path $path -PathType Leaf)) {
         $bytes = [System.IO.File]::ReadAllBytes($path)
         $ext = [System.IO.Path]::GetExtension($path).ToLower()

@@ -602,3 +602,94 @@ html.locked, html.locked body { overflow: hidden; }
 .fopen .ffront i { display: block; left: 62%; width: 28%; top: 6.6%; height: 6.6%; background: #fff; }
 /* ===== version 29: the white bar runs out to the same right-hand margin it had in the original design ===== */
 .fopen .ffront i { left: 62%; width: 34.25%; }
+/* ===== version 30: no white bar on the folders; the front is one solid colour ===== */
+.fopen .ffront i, .shut i { display: none; }
+/* ===== version 31: the sheet is one plain rectangle, fully tucked behind the flap, and slides up whole on hover ===== */
+.fopen .fpaper { top: 24%; clip-path: none; transition: transform .4s var(--ease); }
+.folders button:hover .fpaper, .folders button:focus-visible .fpaper { transform: translateY(-13%); clip-path: none; }
+/* ===== version 32: opening "what else?" no longer lifts the greeting and description; the role folders drop in below without moving them ===== */
+@media (min-width: 1001px) {
+  .about > div:first-child { position: relative; }
+  .about .roles { position: absolute; left: 0; right: 0; top: 100%; }
+}
+/* On narrower two-column screens there is less room under the text, so it sits at the top of its column instead. */
+@media (min-width: 761px) and (max-width: 1000px) { .about { align-items: start; } }
+/* ===== version 33: the nav is liquid glass; a drop of water marks the current page and runs to the link you point at ===== */
+.nav .glass, .nav .home {
+  pointer-events: auto; position: relative; border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .4), rgba(255, 255, 255, .14));
+  -webkit-backdrop-filter: blur(14px) saturate(1.8); backdrop-filter: blur(14px) saturate(1.8);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 0 0 1px rgba(255, 255, 255, .3), inset 0 -9px 14px -9px rgba(0, 0, 0, .16), 0 12px 28px -12px rgba(0, 0, 0, .4), 0 1px 3px rgba(0, 0, 0, .14);
+}
+.nav .glass { padding: clamp(10px, .85vw, 15px) clamp(20px, 1.9vw, 34px); }
+.nav .glass::after, .nav .home::after { content: ''; position: absolute; inset: 1px; border-radius: inherit; pointer-events: none; background: linear-gradient(112deg, rgba(255, 255, 255, .5) 0, rgba(255, 255, 255, 0) 28%, rgba(255, 255, 255, 0) 72%, rgba(255, 255, 255, .22) 100%); }
+.nav .glass ul { position: relative; z-index: 1; }
+.nav .home { display: grid; place-items: center; padding: clamp(8px, .7vw, 12px); }
+.nav .home img { position: relative; z-index: 1; display: block; }
+.nav .dropwrap { position: absolute; inset: 0; opacity: 0; transition: opacity .5s ease; pointer-events: none; }
+.nav .dropwrap.show { opacity: .7; }
+.nav .drops { position: absolute; inset: 0; filter: url(#goo) drop-shadow(0 0 1px rgba(0, 0, 0, .6)) drop-shadow(0 2px 3px rgba(0, 0, 0, .45)); }
+.nav .drop { position: absolute; top: 5px; bottom: 5px; border-radius: 999px; background: #fff; }
+.nav .bead { position: absolute; top: 50%; border-radius: 50%; background: #fff; }
+.nav .ring { position: absolute; top: 5px; bottom: 5px; border-radius: 999px; border: 1.5px solid rgba(255, 255, 255, .95); box-shadow: 0 0 0 1px rgba(0, 0, 0, .1); pointer-events: none; opacity: 0; }
+/* ===== version 34: the nav sits flush on the page: no pill, border or shadow. Only the water drop remains ===== */
+.nav .glass, .nav .home { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+.nav .glass::after, .nav .home::after { content: none; }
+.nav .home { padding: 0; }
+/* ===== version 35: the intro leaves like a curtain: the black slides up and its bottom edge bulges into a curve, then flattens ===== */
+.intro { clip-path: none; transition: transform .95s cubic-bezier(.76, 0, .24, 1); }
+.intro::after { content: ''; position: absolute; top: calc(100% - 1px); left: -15%; width: 130%; height: 0; background: #000; border-radius: 0 0 50% 50% / 0 0 100% 100%; pointer-events: none; }
+.intro.leave { clip-path: none; transform: translateY(-100%); }
+.intro.leave::after { animation: curtain .95s cubic-bezier(.76, 0, .24, 1) both; }
+.intro.leave span { transform: none; opacity: 1; }
+@keyframes curtain { 0% { height: 0; } 45% { height: 30vh; } 100% { height: 0; } }
+@media (prefers-reduced-motion: reduce) { .intro.leave::after { animation: none; } }
+/* ===== version 36: the cover has a blob of black liquid instead of drifting icons; the icons now drift on the Projects cover ===== */
+.hero { background: #fff; isolation: isolate; }
+.ferro { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 1.4s ease; }
+.ferro.go { opacity: 1; }
+/* Where the liquid passes behind the logo, the tags or the clock, they flip to white so they stay readable. */
+.hero .hero-mid, .hero .hero-foot, .hero > .liquid { mix-blend-mode: difference; }
+.hero .hero-mid .mark, .hero > .liquid { filter: invert(1); }
+.hero .hero-foot, .hero .hero-foot * { color: #fff; }
+.phero { position: relative; overflow: hidden; }
+.phero .pmid, .phero .catnav { position: relative; z-index: 1; }
+/* ===== version 37: on the Projects cover the four category arrows and bars line up even when a label is long ===== */
+.catnav a { display: flex; flex-direction: column; justify-content: flex-end; }
+@media (max-width: 520px) {
+  .catnav { gap: 6px; padding-left: 8px; padding-right: 8px; }
+  .catnav a { font-size: 10px; white-space: nowrap; }
+}
+/* ===== version 38: on a phone the menu sits along the bottom of the screen, within reach of a thumb ===== */
+@media (max-width: 760px) {
+  .nav, .hero > .nav, .phero > .nav { top: auto; bottom: 0; padding: 10px var(--pad) calc(12px + env(safe-area-inset-bottom, 0px)); }
+  #app > .nav + * { margin-top: clamp(18px, 5vw, 30px); }
+  #app { padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px)); } /* so the footer is never hidden behind the menu */
+  .totop { bottom: calc(74px + env(safe-area-inset-bottom, 0px)); }
+}
+/* ===== version 39: on a phone the menu is a floating bar of icons in liquid glass, centred along the bottom ===== */
+.nav .ico, .nav li.m-only { display: none; }
+@media (max-width: 760px) {
+  .nav, .hero > .nav, .phero > .nav { justify-content: center; padding: 0 16px calc(14px + env(safe-area-inset-bottom, 0px)); }
+  .nav > .home, .nav > span:first-child { display: none; }
+  .nav .glass { padding: 7px 10px; border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .5), rgba(255, 255, 255, .2));
+    -webkit-backdrop-filter: blur(16px) saturate(1.8); backdrop-filter: blur(16px) saturate(1.8);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 0 0 1px rgba(255, 255, 255, .35), inset 0 -9px 14px -9px rgba(0, 0, 0, .16), 0 12px 30px -10px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .16); }
+  .nav .glass::after { content: ''; position: absolute; inset: 1px; border-radius: inherit; pointer-events: none; background: linear-gradient(112deg, rgba(255, 255, 255, .5) 0, rgba(255, 255, 255, 0) 28%, rgba(255, 255, 255, 0) 72%, rgba(255, 255, 255, .22) 100%); }
+  .nav ul { gap: 4px; }
+  .nav li.m-only { display: block; }
+  .nav a { display: grid; place-items: center; width: 58px; height: 44px; position: relative; }
+  .nav .ico { display: block; width: 24px; height: 24px; }
+  .nav .ico svg { width: 100%; height: 100%; display: block; }
+  /* the Home icon is the portfolio flower, cut out so it takes the same colour as the other icons */
+  .nav .ico.flower { background: currentColor; -webkit-mask: url(../assets/flower.png) center / contain no-repeat; mask: url(../assets/flower.png) center / contain no-repeat; }
+  .nav .lab { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .nav .drop, .nav .ring { top: 4px; bottom: 4px; }
+  /* the Projects cover keeps its four category links clear of the menu */
+  .phero { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  #app { padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
+  .totop { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
+}
+/* ===== version 40: About is a section of the home page; the menu scrolls to it, leaving the ABOUT ME band in view above ===== */
+#about { scroll-margin-top: 46px; }
