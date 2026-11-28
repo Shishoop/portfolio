@@ -718,3 +718,75 @@ html.locked, html.locked body { overflow: hidden; }
 .phero { scroll-margin-top: 0; }
 /* on a phone the flower in the menu already takes you to the top, so the separate back-to-top button is not needed (and it sat on the category links) */
 @media (max-width: 760px) { .totop { display: none; } }
+/* ===== version 44: UI & UX projects as records on a tall open shelf; a clicked spine is lifted out and opens into its picture ===== */
+.vshelf { max-width: 1180px; margin: 0 auto; }
+.vstage { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(22px, 5vw, 80px); align-items: center; padding: clamp(6px, 1vw, 16px) 0 clamp(30px, 4vw, 60px); }
+.vnow { position: relative; padding-right: 17%; transform-origin: 0 0; } /* sleeve and disc move as one */
+/* the sleeve takes the shape of the picture on it: 16:9 unless the picture says otherwise */
+.vsleeve { position: relative; z-index: 1; width: 100%; aspect-ratio: 16 / 9; background: #e9e9e9; border: 2px solid #000; overflow: hidden; transform-origin: 0 0; box-shadow: 8px 8px 0 -2px rgba(0, 0, 0, .12); transition: aspect-ratio .35s var(--ease); }
+.vart, .vart img, .vmore img { width: 100%; height: 100%; display: block; }
+.vart img, .vmore img { object-fit: cover; }
+.vskin { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+.vblank { display: grid; place-items: center; width: 100%; height: 100%; padding: 8%; text-align: center; color: #fff; font-family: var(--font-sans); font-size: clamp(13px, 1.5vw, 24px); line-height: 1.15; overflow-wrap: anywhere; }
+/* the disc waits behind the sleeve, then slides out to the right and turns */
+.vdisc { position: absolute; top: 3%; bottom: 3%; right: 17%; aspect-ratio: 1; border-radius: 50%; background: repeating-radial-gradient(circle, #111 0 2px, #2a2a2a 2px 3px); transition: transform .7s cubic-bezier(.3, .1, .2, 1); }
+.vdisc.on { transform: translateX(46%); }
+.vdisc i { position: absolute; inset: 32%; border-radius: 50%; background: #fff; border: 2px solid #000; animation: vspin 5s linear infinite; }
+.vdisc i::before { content: ''; position: absolute; left: 50%; top: 50%; width: 12%; height: 12%; margin: -6% 0 0 -6%; border-radius: 50%; background: #000; }
+.vdisc i::after { content: ''; position: absolute; left: 50%; top: 10%; width: 2px; height: 24%; margin-left: -1px; background: #000; }
+@keyframes vspin { to { transform: rotate(360deg); } }
+.vinfo { min-width: 0; }
+.vno { font-size: clamp(11px, .9vw, 15px); color: var(--mute); }
+.vinfo h3 { font-family: var(--font-sans); font-weight: 400; font-size: clamp(24px, 3vw, 52px); line-height: 1.08; margin: .15em 0 .2em; overflow-wrap: anywhere; }
+.vrole { font-family: var(--font-sans); font-style: italic; margin: 0 0 .7em; font-size: clamp(14px, 1.15vw, 20px); }
+.vtext { margin: 0 0 1em; font-size: clamp(13px, 1.05vw, 18px); line-height: 1.5; max-width: 52ch; white-space: pre-line; }
+.vmore { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 1.1em; }
+.vmore button { width: clamp(52px, 5vw, 84px); aspect-ratio: 16 / 9; padding: 0; border: 2px solid var(--line); background: #eee; cursor: pointer; }
+.vmore button[aria-pressed="true"] { border-color: #000; }
+/* the shelf: black uprights that stand a little taller than the top board and reach the floor, thin boards between */
+.vunit { position: relative; display: grid; grid-template-columns: repeat(var(--cubs, 3), minmax(0, 1fr)); padding: clamp(18px, 2.4vw, 34px) 0 clamp(16px, 2vw, 28px); }
+.vpost { position: absolute; top: 0; bottom: 0; width: 5px; margin-left: -2.5px; background: #000; }
+.vpost:first-of-type { margin-left: 0; } .vpost:last-of-type { margin-left: -5px; }
+.vcub { display: flex; align-items: flex-end; gap: 2px; height: clamp(120px, 15vw, 210px); padding: 0 clamp(12px, 1.6vw, 24px); border-top: 3px solid #000; min-width: 0; }
+.vcub.right { justify-content: flex-end; }
+.vcub.floor { border-bottom: 3px solid #000; }
+/* a record seen spine-on: tall and thin, its title running up the spine */
+.vrec { flex: 0 0 auto; width: clamp(20px, 2vw, 28px); height: 84%; padding: 0; border: 2px solid #000; cursor: pointer; overflow: hidden; display: grid; place-items: center; transform-origin: 50% 100%; transition: transform .28s var(--ease), opacity .25s ease; }
+.vrec span { writing-mode: vertical-rl; transform: rotate(180deg); color: #fff; font-size: 9px; letter-spacing: .06em; white-space: nowrap; }
+.vrec:hover, .vrec:focus-visible { transform: translateY(-12%); outline: none; }
+.vrec.out { opacity: 0; pointer-events: none; }
+.vrec.plain { cursor: default; background: #fff; border-color: #bdbdbd; width: clamp(9px, .9vw, 13px); }
+.vrec.plain:hover { transform: none; }
+.vrec.plain.lean, .vrec.plain.lean:hover { transform: rotate(11deg); transform-origin: 0 100%; margin-left: 4px; margin-right: 12px; }
+.vcub.right .vrec.plain.lean, .vcub.right .vrec.plain.lean:hover { order: -1; transform: rotate(-11deg); transform-origin: 100% 100%; margin-left: 12px; margin-right: 4px; }
+@media (max-width: 760px) {
+  .vstage { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .vnow { padding-right: 19%; }
+  .vdisc { right: 19%; }
+  .vcub { height: 31vw; padding: 0 10px; }
+  .vrec { width: 22px; }
+  .vrec.plain { width: 9px; }
+}
+@media (prefers-reduced-motion: reduce) { .vdisc, .vrec, .vsleeve { transition: none; } .vdisc i { animation: none; } }
+/* the record on the stand can be clicked to put it back; the stand then shows an empty outline until the next pick */
+.vnow { cursor: pointer; }
+.vnow:focus-visible { outline: 2px solid #000; outline-offset: 6px; }
+.vstage.idle .vnow { cursor: default; }
+.vstage.idle .vsleeve, .vstage.idle .vdisc { visibility: hidden; }
+.vstage.idle .vnow::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; right: 17%; border: 2px dashed #cfcfcf; }
+.vhint { margin: 0; color: var(--mute); font-size: clamp(13px, 1.05vw, 18px); }
+@media (max-width: 760px) { .vstage.idle .vnow::after { right: 19%; } }
+/* ===== version 45: the name tube, top left: a glass tube where black liquid gathers into the name once you scroll past the cover ===== */
+.nametube { position: fixed; z-index: 31; left: var(--pad); top: calc(clamp(12px, 1.8vw, 28px) + env(safe-area-inset-top, 0px)); display: block; border-radius: 999px; line-height: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .6), rgba(255, 255, 255, .24));
+  -webkit-backdrop-filter: blur(14px) saturate(1.8); backdrop-filter: blur(14px) saturate(1.8);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .95), inset 0 0 0 1px rgba(255, 255, 255, .4), inset 0 -8px 12px -8px rgba(0, 0, 0, .2), inset 0 6px 10px -8px rgba(0, 0, 0, .1), 0 10px 24px -10px rgba(0, 0, 0, .42), 0 1px 3px rgba(0, 0, 0, .15);
+  opacity: 0; transform: translateY(-10px) scaleX(.55); transform-origin: 0 50%; pointer-events: none; transition: opacity .45s ease, transform .6s var(--ease); }
+.nametube.on { opacity: 1; transform: none; pointer-events: auto; }
+/* the bright streak along the top of the glass, and the darker curve underneath, are what make it read as a tube */
+.nametube::before { content: ''; position: absolute; left: 9%; right: 9%; top: 3px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, .85) 20%, rgba(255, 255, 255, .85) 80%, rgba(255, 255, 255, 0)); pointer-events: none; }
+.nametube::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(112deg, rgba(255, 255, 255, .35) 0, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0) 75%, rgba(255, 255, 255, .18) 100%); pointer-events: none; }
+.nametube canvas { display: block; filter: url(#goo-fine); }
+@media (prefers-reduced-motion: reduce) { .nametube { transition: none; } }
+/* the ink crossing the screen between the cover and the name tube */
+.inkpour { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 30; pointer-events: none; display: none; filter: url(#goo-pour); }

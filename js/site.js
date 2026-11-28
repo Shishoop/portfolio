@@ -358,7 +358,7 @@
     var canvas = h('canvas', { class: 'ferro', 'aria-hidden': 'true' }), ctx = canvas.getContext('2d');
     var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var W = 0, H = 0, S = 0, dpr = 1, G = 8, cols = 0, rows = 0, field = null, balls = [], raf = 0, born = 0, seen = true, topY = 0, navY = 0;
-    var mid = { x: 0, y: 0, vx: 0, vy: 0 }, ptr = { x: 0, y: 0, on: false }, parked = false, floorY = 1e9, beat = 0, nextBeat = 0, lastT = 0, sim = 0, acc = 0, prev = 0;
+    var mid = { x: 0, y: 0, vx: 0, vy: 0 }, ptr = { x: 0, y: 0, on: false }, parked = false, floorY = 1e9, beat = 0, nextBeat = 0, lastT = 0, sim = 0, acc = 0, prev = 0, ink = 1, inkTo = 1, anchor = null;
     hero.insertBefore(canvas, hero.firstChild);
     function rnd(a, b) { return a + Math.random() * (b - a); }
     function size() {
@@ -394,6 +394,7 @@
       // (on a phone, the way it is being tilted takes the place of the pointer: the liquid runs to the low side)
       var tx = parked ? W * 0.5 : ptr.on ? ptr.x : tilt.on ? W * (0.5 + tilt.x * 0.32) + S * 0.03 * Math.sin(t * 1.3) : W * (0.5 + 0.3 * Math.sin(t * 0.41) + 0.1 * Math.sin(t * 1.07 + 1));
       var ty = parked ? H * 0.5 : ptr.on ? ptr.y : tilt.on ? H * (0.5 + tilt.y * 0.34) + S * 0.03 * Math.cos(t * 1.1) : H * (0.52 + 0.2 * Math.sin(t * 0.53 + 2) + 0.07 * Math.cos(t * 0.93));
+      if (anchor) { tx = anchor.x; ty = anchor.y; } // being refilled from the name tube: it stays where the ink is landing
       ty = Math.min(floorY - S * 0.17, Math.max(topY, ty));
       mid.vx = (mid.vx + (tx - mid.x) * 0.02) * 0.9; mid.vy = (mid.vy + (ty - mid.y) * 0.02) * 0.9;
       mid.x += mid.vx; mid.y += mid.vy;
@@ -423,9 +424,10 @@
     function draw(t) {
       var grow = still ? 1 : Math.min(1, (t - born) / 1.6), i, j, n;
       grow = 1 - Math.pow(1 - grow, 3);
+      ink += (inkTo - ink) * 0.2; // how much of the liquid is still on the cover; the rest has gone to the name tube
       field.fill(0);
       for (n = 0; n < balls.length; n++) {
-        var b = balls[n], rr = b.r * S * grow * (b.big ? 1 + 0.16 * Math.sin(t * 3.4 + b.p) + beat * 0.12 : 1), r2 = rr * rr;
+        var b = balls[n], rr = b.r * S * grow * ink * (b.big ? 1 + 0.16 * Math.sin(t * 3.4 + b.p) + beat * 0.12 : 1), r2 = rr * rr;
         // a ball only matters near itself, so only that patch of the grid is touched
         var reach = rr * 5, i0 = Math.max(0, Math.floor((b.x - reach) / G)), i1 = Math.min(cols - 1, Math.ceil((b.x + reach) / G));
         var j0 = Math.max(0, Math.floor((b.y - reach) / G)), j1 = Math.min(rows - 1, Math.ceil((b.y + reach) / G));
@@ -525,6 +527,21 @@
     var timer;
     window.addEventListener('resize', function () { clearTimeout(timer); timer = setTimeout(function () { size(); if (still && born) draw(born + 9); }, 150); });
     return {
+      // where the middle of the liquid is on screen right now, and how much of it should stay on the cover
+      where: function () { if (!born) return null; var r = hero.getBoundingClientRect(); return { x: r.left + mid.x, y: r.top + mid.y }; },
+      ink: function (v) { inkTo = Math.max(0, Math.min(1, v)); if (!raf) ink = inkTo; },
+      // Start the liquid afresh at a point on the screen (where ink coming back from the tube lands) and keep
+      // it there until released. Returns the spot actually used, which is kept inside the cover.
+      spawn: function (vx, vy) {
+        if (!born) return null;
+        var r = hero.getBoundingClientRect(), m = S * 0.16;
+        anchor = { x: Math.max(m, Math.min(W - m, vx - r.left)), y: Math.max(topY, Math.min(Math.min(H, floorY) - S * 0.2, vy - r.top)) };
+        mid.x = anchor.x; mid.y = anchor.y; mid.vx = mid.vy = 0;
+        balls.forEach(function (b) { b.x = anchor.x; b.y = anchor.y; b.vx = b.vy = 0; });
+        parked = false; ptr.on = false;
+        return { x: r.left + anchor.x, y: r.top + anchor.y };
+      },
+      release: function () { anchor = null; },
       start: function () {
         size();
         born = performance.now() / 1000;
@@ -535,6 +552,210 @@
     };
   }
 
+  // The name tube: a small glass tube at the top left. When you scroll past the cover, the cover's own black
+  // liquid leaves it: a stream of ink runs across the screen and in through the left end of the tube, pools
+  // there, then flows along and gathers into the flower and the letters of the name. Scroll back up and it
+  // all melts, runs back to the mouth, and pours out to the cover again.
+  // It is the cover liquid in miniature: hundreds of tiny drops that merge where they touch, each knowing which
+  // part of which shape it belongs to. Nothing in it sits still: the shapes ride a rolling wave, lean when the
+  // page scrolls, drip, and every few seconds a ripple runs along and melts them for a moment. Under the
+  // pointer it lets go completely and scatters.
+  function nameTube(text, cover) {
+    var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var canvas = h('canvas', { 'aria-hidden': 'true' }), ctx = canvas.getContext('2d');
+    var tube = h('a', { class: 'nametube', href: '#', 'aria-label': text + ', back to the top' }, canvas);
+    var pour = h('canvas', { class: 'inkpour', 'aria-hidden': 'true' }), pctx = pour.getContext('2d');
+    var W = 0, H = 0, dpr = 1, drops = [], shapes = [], drips = [], raf = 0, last = 0, ptr = null, face = '', size = 0, mouth = 0;
+    var want = 0, fill = 0, prog = 0, loose = 0, slosh = 0, sloshV = 0, lastY = window.scrollY, nextDrip = 0, from = null, respawn = false;
+    // The lettering. To use another typeface (for example a licensed liquid display font), add it to the
+    // page with @font-face and put its name first in this list.
+    var FAMILY = 'Jost, sans-serif', WEIGHT = 600;
+    var flower = new Image();
+    if (!document.getElementById('goo-fine')) {
+      var svg = h('div', { 'aria-hidden': 'true', style: 'position:absolute;width:0;height:0;overflow:hidden' });
+      svg.innerHTML = '<svg width="0" height="0"><filter id="goo-fine"><feGaussianBlur in="SourceGraphic" stdDeviation="1"/>' +
+        '<feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 15 -5.5"/></filter>' +
+        '<filter id="goo-pour"><feGaussianBlur in="SourceGraphic" stdDeviation="5"/><feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8"/></filter></svg>';
+      document.body.appendChild(svg);
+    }
+    document.body.append(pour, tube);
+    function build() {
+      var fs = Math.max(17, Math.min(21, window.innerWidth * 0.046)), pad = fs * 0.95, i;
+      face = WEIGHT + ' ' + fs + 'px ' + FAMILY; size = fs; mouth = pad * 0.8;
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.font = face;
+      var fl = flower.naturalWidth ? fs * 1.2 : 0, gapF = fl ? fs * 0.42 : 0; // the flower sits first, then the name
+      H = Math.round(fs * 2.3); W = Math.ceil(fl + gapF + ctx.measureText(text).width + pad * 2);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+      canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+      ctx.font = face; // resizing a canvas wipes its settings, so the typeface has to be set again before measuring
+      // every shape in the tube: the flower, then each letter, so each can move on its own
+      shapes = [];
+      if (fl) shapes.push({ img: true, x: pad, w: fl });
+      for (i = 0; i < text.length; i++) shapes.push({ ch: text.charAt(i), x: pad + fl + gapF + ctx.measureText(text.slice(0, i)).width, w: ctx.measureText(text.charAt(i)).width });
+      // draw them once on a hidden canvas, then read back where the ink is: those are the drops' places
+      var k = 3, off = document.createElement('canvas'), o = off.getContext('2d', { willReadFrequently: true });
+      off.width = W * k; off.height = H * k;
+      o.scale(k, k); o.font = face; o.textBaseline = 'middle';
+      shapes.forEach(function (s) { if (s.img) o.drawImage(flower, s.x, H / 2 - s.w / 2, s.w, s.w); else o.fillText(s.ch, s.x, H / 2 + fs * 0.04); });
+      var d = o.getImageData(0, 0, off.width, off.height).data, gap = 1.3;
+      drops = []; drips = [];
+      for (var y = gap / 2; y < H; y += gap) for (var x = gap / 2; x < W; x += gap) {
+        if (d[(Math.round(y * k) * off.width + Math.round(x * k)) * 4 + 3] < 120) continue;
+        var an = Math.random() * 6.283, r = Math.sqrt(Math.random()) * H * 0.3, si = 0;
+        for (i = 0; i < shapes.length; i++) if (x >= shapes[i].x - 0.5) si = i;
+        drops.push({ tx: x, ty: y, hx: mouth + Math.cos(an) * r, hy: H / 2 + Math.sin(an) * r * 0.8, wait: x / W * 0.62 + Math.random() * 0.1, ph: Math.random() * 6.283, ox: 0, oy: 0, vx: 0, vy: 0, si: si, low: y > H / 2 + fs * 0.12 });
+      }
+      pour.width = window.innerWidth; pour.height = window.innerHeight;
+    }
+    // How far shape i is riding up or down right now: a wave that keeps rolling along the tube.
+    function ride(i, t) { return Math.sin(t * 2.4 - i * 0.62) * size * 0.11 + Math.sin(t * 1.5 + i * 1.9) * size * 0.045; }
+    // A ripple that sweeps along the tube every few seconds and melts each shape as it passes.
+    function melt(i, t) { var at = ((t * 0.55) % 3.4) / 3.4 * (shapes.length + 6) - 3; return Math.max(0, 1 - Math.abs(i - at) / 1.6); }
+    // The ink crossing the screen between the cover and the mouth of the tube: a string of blobs, fat at the
+    // cover end and thin where it enters the glass. `amount` runs 0 to 1 over the pour.
+    function stream(amount, inward) {
+      pctx.clearRect(0, 0, pour.width, pour.height);
+      if (amount <= 0 || amount >= 1 || !from) { pour.style.display = 'none'; return; }
+      pour.style.display = 'block';
+      var mx = tube.offsetLeft + mouth, my = tube.offsetTop + H / 2, sx = from.x, sy = from.y;
+      var cx2 = mx + (sx - mx) * 0.55, cy2 = Math.min(sy, my) + Math.abs(sy - my) * 0.2 + 46; // the curve it follows
+      var q = inward ? amount : 1 - amount, head = Math.min(1, q * 1.5), tail = Math.max(0, q * 1.5 - 0.5);
+      head = head * head * (3 - 2 * head); tail = tail * tail * (3 - 2 * tail);
+      pctx.fillStyle = '#000'; pctx.beginPath();
+      for (var j = 0; j <= 34; j++) {
+        var u = tail + (head - tail) * j / 34, w = inward ? u : 1 - u, m = 1 - w; // w runs from the cover (0) to the tube (1)
+        var x = m * m * sx + 2 * m * w * cx2 + w * w * mx, y = m * m * sy + 2 * m * w * cy2 + w * w * my;
+        var rad = (13 - 9 * w) * (0.75 + 0.25 * Math.sin(j * 1.7 + amount * 20));
+        x += Math.sin(j * 0.9 + amount * 14) * 3 * (1 - w);
+        pctx.moveTo(x + rad, y); pctx.arc(x, y, rad, 0, 6.2832);
+      }
+      pctx.fill();
+    }
+    function frame(now) {
+      raf = 0;
+      var dt = Math.min(0.05, (now - last) / 1000 || 0), t = now / 1000, i;
+      last = now;
+      // The order of events. Going in: the ink pours into the tube and pools, and only then gathers into the
+      // name. Going out: the name melts back to the pool first, and only then pours away.
+      if (want) { if (fill < 1) fill = Math.min(1, fill + dt / 1.9); else prog = Math.min(1, prog + dt / 1.7); }
+      else { if (prog > 0) prog = Math.max(0, prog - dt / 1.0); else fill = Math.max(0, fill - dt / 2.3); }
+      if (cover) {
+        // Coming back out: the liquid does not reappear where it used to be. It starts again as nothing at
+        // the spot the stream is aimed at, down and to the right of the tube's mouth, and is held there.
+        if (!want && prog <= 0 && respawn) {
+          respawn = false;
+          cover.spawn(tube.offsetLeft + mouth + window.innerWidth * 0.3, tube.offsetTop + H / 2 + window.innerHeight * 0.3);
+        }
+        // The stream always runs to wherever the cover liquid is at this moment, even as the page scrolls.
+        var at = cover.where();
+        if (at) from = { x: Math.max(20, Math.min(window.innerWidth - 20, at.x)), y: Math.max(-30, Math.min(window.innerHeight + 30, at.y)) };
+        // How much is on the cover follows the stream, not a switch. Going in, the blob shrinks steadily as
+        // ink leaves it and is gone by the time the tail of the stream sets off. Coming out, it stays
+        // empty until the head of the stream arrives, then swells as the rest pours in.
+        var lvl = want ? 1 - Math.min(1, fill / 0.8) : Math.max(0, (1 - fill - 0.3) / 0.7);
+        cover.ink(lvl * lvl * (3 - 2 * lvl));
+        if (!want && fill <= 0) cover.release(); // all back: it is free to wander again
+      }
+      stream(fill, !!want);
+      // scrolling the page throws the liquid: it leans against the direction of travel, then swings back
+      sloshV += (-slosh * 60 - sloshV * 7) * dt; slosh += sloshV * dt;
+      var lean = Math.max(-0.5, Math.min(0.5, slosh));
+      // While the pointer is over the tube it stops being shapes and is just liquid again.
+      loose = Math.max(0, Math.min(1, loose + (ptr ? dt * 7 : -dt * 2.2)));
+      // every so often a drop hangs off the bottom of a shape, stretches, and is drawn back up
+      if (prog >= 1 && !loose && t > nextDrip && drops.length) {
+        nextDrip = t + 0.2 + Math.random() * 0.7;
+        for (var tries = 0; tries < 12; tries++) { var c = drops[Math.floor(Math.random() * drops.length)]; if (c.low && !c.fall) { drips.push({ d: c, t0: t, len: H * (0.18 + Math.random() * 0.18) }); break; } }
+      }
+      for (i = drips.length - 1; i >= 0; i--) if (t - drips[i].t0 > 1.4) { drips[i].d.fall = 0; drips.splice(i, 1); }
+      drips.forEach(function (dr) { var u = (t - dr.t0) / 1.4; dr.d.fall = Math.sin(Math.PI * Math.pow(u, 0.7)) * dr.len; });
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#000';
+      // Behind the front of the flow the shapes have set, so the name is readable. Each one rides the wave
+      // and leans with the slosh on its own; where the ripple is passing, or under the pointer, it is unset.
+      var front = (prog - 0.28) / 0.62 * W - size * 0.5, soft = [];
+      ctx.font = face; ctx.textBaseline = 'middle';
+      for (i = 0; i < shapes.length; i++) {
+        var s = shapes[i];
+        soft[i] = prog >= 1 ? Math.max(loose, melt(i, t)) : loose;
+        if (s.x + s.w * 0.5 > front || s.ch === ' ' || soft[i] > 0.3) continue;
+        var by = H / 2 + ride(i, t), squash = 1 + Math.sin(t * 2.4 - i * 0.62 + 1.2) * 0.09;
+        ctx.setTransform(dpr * (2 - squash), 0, dpr * -lean * 0.5, dpr * squash, dpr * (s.x + s.w / 2 + lean * 3), dpr * by);
+        if (s.img) ctx.drawImage(flower, -s.w / 2, -s.w / 2, s.w, s.w); else ctx.fillText(s.ch, -s.w / 2, size * 0.04);
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.beginPath();
+      var pool = Math.min(1, fill * 1.15);
+      for (i = 0; i < drops.length; i++) {
+        var p = drops[i], e = Math.max(0, Math.min(1, (prog - p.wait) / 0.28)), sf = soft[p.si] || 0;
+        e = e * e * (3 - 2 * e);
+        // on its way each drop runs along the middle of the tube, then rises or sinks into its place in a shape
+        var x = p.hx + (p.tx - p.hx) * e, y = p.hy + (H / 2 - p.hy) * Math.sin(Math.PI * e) * 0.9 + (p.ty - p.hy) * e * e;
+        var stir = (1.1 - 0.3 * e) * (1 + 1.6 * sf);
+        x += Math.sin(t * 2.8 + p.ph) * stir - lean * (p.ty - H / 2) * 0.5 * e + lean * 3 * e;
+        y += Math.cos(t * 2.3 + p.ph * 1.7) * stir + ride(p.si, t) * e + (p.fall || 0) + sf * e * Math.sin(t * 3 + p.ph) * 1.5;
+        // Each drop can be knocked away from its place and is pulled back by a spring. Under the pointer the
+        // push is hard and the spring is slack, so the liquid scatters and drifts; once the pointer has gone
+        // the spring tightens and the drops run home.
+        var ax = -p.ox * (ptr ? 5 : 70) - p.vx * (ptr ? 3.2 : 11), ay = -p.oy * (ptr ? 5 : 70) - p.vy * (ptr ? 3.2 : 11);
+        if (ptr) {
+          var dx = x + p.ox - ptr.x, dy = y + p.oy - ptr.y, dist = Math.sqrt(dx * dx + dy * dy) || 1, reach = size * 2.4;
+          if (dist < reach) { var push = (1 - dist / reach) * 2600; ax += dx / dist * push; ay += dy / dist * push; }
+          ax += Math.sin(t * 5 + p.ph * 3) * 60; ay += Math.cos(t * 4.3 + p.ph * 2) * 60; // and it never quite settles
+        }
+        p.vx += ax * dt; p.vy += ay * dt; p.ox += p.vx * dt; p.oy += p.vy * dt;
+        var fx = x + p.ox, fy = y + p.oy;
+        // the glass keeps it in: drops bounce off the inside of the tube
+        if (fx < 3) { p.ox += 3 - fx; p.vx = Math.abs(p.vx) * 0.5; fx = 3; } else if (fx > W - 3) { p.ox -= fx - (W - 3); p.vx = -Math.abs(p.vx) * 0.5; fx = W - 3; }
+        if (fy < 3) { p.oy += 3 - fy; p.vy = Math.abs(p.vy) * 0.5; fy = 3; } else if (fy > H - 3) { p.oy -= fy - (H - 3); p.vy = -Math.abs(p.vy) * 0.5; fy = H - 3; }
+        // drops are fatter while pooled, and the pool is only as big as the ink that has arrived so far
+        var rad = ((1.9 - 0.95 * e) * (p.fall ? 1.4 : 1) + 0.45 * sf * e) * (e > 0 ? 1 : pool);
+        if (rad < 0.15) continue;
+        ctx.moveTo(fx + rad, fy);
+        ctx.arc(fx, fy, rad, 0, 6.2832);
+      }
+      ctx.fill();
+      if (!want && fill <= 0) { tube.classList.remove('on'); pour.style.display = 'none'; return; } // empty: stop until wanted again
+      if (!document.hidden) raf = requestAnimationFrame(frame);
+    }
+    function wake() { if (!raf && (want || fill > 0)) { last = performance.now(); raf = requestAnimationFrame(frame); } }
+    function check() {
+      var y = window.scrollY, now = y > window.innerHeight * 0.5 ? 1 : 0;
+      sloshV += Math.max(-40, Math.min(40, y - lastY)) * 0.06; lastY = y;
+      if (now === want) return;
+      want = now;
+      if (!from) from = { x: window.innerWidth / 2, y: -30 };
+      if (want) { tube.classList.add('on'); if (cover) cover.release(); }
+      else respawn = fill >= 1; // only start afresh if all of it had gone into the tube
+      if (still) { fill = prog = want; respawn = false; if (cover) { cover.release(); cover.ink(1 - fill); } if (!want) tube.classList.remove('on'); else { last = performance.now(); frame(last); cancelAnimationFrame(raf); raf = 0; } return; }
+      wake();
+    }
+    function touch(e) {
+      var r = canvas.getBoundingClientRect(), first = !ptr;
+      ptr = { x: e.clientX - r.left, y: e.clientY - r.top };
+      if (first) drops.forEach(function (p) { // the moment it is touched, the name bursts apart from that spot
+        var dx = p.tx - ptr.x, dy = p.ty - ptr.y, d = Math.sqrt(dx * dx + dy * dy) || 1, kick = Math.max(0, 1 - d / (W * 0.7)) * 190 + 40;
+        p.vx += dx / d * kick + (Math.random() - 0.5) * 70; p.vy += dy / d * kick + (Math.random() - 0.5) * 70;
+      });
+      wake();
+    }
+    tube.addEventListener('click', function (e) { e.preventDefault(); window.scrollTo({ top: 0, behavior: still ? 'auto' : 'smooth' }); });
+    tube.addEventListener('pointerenter', touch);
+    tube.addEventListener('pointermove', touch);
+    tube.addEventListener('pointerdown', touch);
+    tube.addEventListener('pointerleave', function () { ptr = null; });
+    tube.addEventListener('pointercancel', function () { ptr = null; });
+    window.addEventListener('scroll', check, { passive: true });
+    document.addEventListener('visibilitychange', wake);
+    var timer;
+    window.addEventListener('resize', function () { clearTimeout(timer); timer = setTimeout(function () { build(); wake(); }, 200); });
+    var ready = function () { (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(function () { build(); check(); }); };
+    flower.onload = ready; flower.onerror = ready; // with or without the flower picture, the name still works
+    flower.src = 'assets/flower.png';
+  }
   // Liquid logo: the cover logo and its tags stay solid, but near the pointer they bend, stretch and wobble
   // like the surface of a liquid, then settle. The artwork is warped on a fine grid, never broken apart.
   function liquid(hero, mark) {
@@ -774,6 +995,7 @@
     // One page, top to bottom: cover, about, projects, contact.
     [hero, marquee(), aboutBlock(false)].concat(projectsParts(), [contactPart(), footer(), toTop()]).forEach(function (part) { app.appendChild(part); });
     flow = ferro(hero);
+    nameTube(s.cardName, flow);
     // arriving with a section in the address (from an old link, or the privacy page): go straight down to it
     if (location.hash.length > 1) setTimeout(function () { var sec = document.getElementById(location.hash.slice(1)); if (sec) sec.scrollIntoView(); }, 120);
     var fluid = liquid(hero, hero.querySelector('.mark'));
@@ -838,42 +1060,140 @@
     return h('div', null, box, picks, cap);
   }
 
-  function uiux(list, title) {
-    var view = h('div', { class: 'pane view', tabindex: '0' });
-    var cells = h('div', { class: 'cells' }, list.map(function (p, n) {
-      return h('button', { 'aria-label': p.title || 'Project ' + (n + 1), onclick: function () { show(n); } }, p.images[0] ? img(p.images[0], '', '') : null);
-    }));
-    for (var k = list.length; k < 22; k++) cells.append(h('span', { class: 'cell', 'aria-hidden': 'true' }));
-    var thumb = h('div', { class: 'sthumb' });
-    var sbar = h('div', { class: 'sbar', 'aria-hidden': 'true' }, thumb);
-    function show(n) {
+  // UI & UX projects are kept like records on a tall open shelf: black uprights, thin boards, and the records
+  // standing spine-out in loose groups, a few leaning, some cubbies left empty. Each project is one spine.
+  // Click a spine and it is lifted out of the shelf and carried to the stand above, where it opens out from
+  // a thin spine into the picture at the picture's own shape (most are 16:9), with a disc sliding out beside it.
+  function uiux(list) {
+    var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var phone = window.matchMedia('(max-width: 760px)').matches, cols = phone ? 2 : 3;
+    // Until there are ten real projects, placeholder records fill the shelf so it never looks empty. They are
+    // only drawn here, never saved: each real project added in the admin takes the place of one.
+    list = list.slice();
+    for (var ph = list.length; ph < 10; ph++) {
+      list.push({ title: 'Project ' + ('0' + (ph + 1)).slice(-2), role: 'UI & UX Design', images: [], link: '',
+        description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.' });
+    }
+    var skin = h('i', { class: 'vskin' }), art = h('div', { class: 'vart' });
+    var sleeve = h('div', { class: 'vsleeve' }, art, skin), disc = h('div', { class: 'vdisc', 'aria-hidden': 'true' }, h('i'));
+    var info = h('div', { class: 'vinfo', 'aria-live': 'polite' });
+    var now = h('div', { class: 'vnow' }, disc, sleeve);
+    var stage = h('div', { class: 'vstage' }, now, info);
+    var recs = [], timer = 0, cur = -1, busy = false;
+    function shade(n) { return SHADES[n % SHADES.length]; }
+    // Puts a picture on the sleeve and lets the sleeve take that picture's shape. With no picture it is 16:9.
+    function put(p, n, ref) {
+      sleeve.style.aspectRatio = '16 / 9';
+      if (!ref) { art.replaceChildren(h('span', { class: 'vblank', style: 'background:' + shade(n), text: p.title || 'Project ' + (n + 1) })); return; }
+      var pic = img(ref, '', p.title);
+      var size = function () { if (pic.naturalWidth) sleeve.style.aspectRatio = String(Math.max(0.62, Math.min(2.4, pic.naturalWidth / pic.naturalHeight))); };
+      pic.addEventListener('load', size); size();
+      art.replaceChildren(pic);
+    }
+    function show(n, from) {
+      if (busy) return;
       var p = list[n];
-      view.replaceChildren(h('div', { class: 'caption' }, h('h3', { class: 'swap', text: p.title }), h('p', { class: 'swap', text: p.description })));
-      p.images.forEach(function (r) { view.append(img(r, 'swap', p.title)); });
-      if (p.link) view.append(h('a', { class: 'btn', href: p.link, target: '_blank', rel: 'noopener', text: 'View project' }));
-      view.scrollTop = 0;
-      Array.prototype.forEach.call(cells.children, function (b, n2) { n2 === n ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current'); });
+      cur = n; stage.classList.remove('idle');
+      now.setAttribute('aria-label', (p.title || 'This record') + '. Put it back on the shelf');
+      put(p, n, p.images[0]);
+      info.replaceChildren.apply(info, [
+        h('span', { class: 'vno', text: 'No. ' + ('0' + (n + 1)).slice(-2) + ' / ' + ('0' + list.length).slice(-2) }),
+        h('h3', { text: p.title }),
+        p.role ? h('p', { class: 'vrole', text: p.role }) : null,
+        p.description ? h('p', { class: 'vtext', text: p.description }) : null,
+        // more pictures of the same project: tap one to put it on the sleeve
+        p.images.length > 1 ? h('div', { class: 'vmore' }, p.images.map(function (r, k) {
+          return h('button', { type: 'button', 'aria-label': 'Picture ' + (k + 1) + ' of ' + p.images.length, 'aria-pressed': String(k === 0), onclick: function (e) {
+            put(p, n, r);
+            Array.prototype.forEach.call(e.currentTarget.parentNode.children, function (b) { b.setAttribute('aria-pressed', String(b === e.currentTarget)); });
+          } }, img(r, '', ''));
+        })) : null,
+        p.link ? h('a', { class: 'btn', href: p.link, target: '_blank', rel: 'noopener', text: 'View project' }) : null].filter(Boolean));
+      recs.forEach(function (b, k) { b.classList.toggle('out', k === n); k === n ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current'); });
+      clearTimeout(timer);
+      skin.style.background = shade(n);
+      if (!from || still) { disc.classList.add('on'); return; }
+      // lift the spine straight up out of the shelf, carry it to the stand, and let it open out into the picture.
+      // The disc is inside the sleeve the whole way: it goes back in at once, travels with it, and only
+      // slides out again after the sleeve has landed.
+      disc.style.transition = 'none'; disc.classList.remove('on'); void disc.offsetWidth; disc.style.transition = '';
+      var r0 = stage.getBoundingClientRect();
+      if (r0.top < 0 || r0.top > window.innerHeight * 0.55) stage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      var a = from.getBoundingClientRect(), b = sleeve.getBoundingClientRect(), dx = a.left - b.left, dy = a.top - b.top;
+      var thin = 'scale(' + (a.width / b.width) + ',' + (a.height / b.height) + ')';
+      now.animate([
+        { transform: 'translate(' + dx + 'px,' + dy + 'px) ' + thin },
+        { transform: 'translate(' + dx + 'px,' + (dy - a.height * 0.95) + 'px) ' + thin, offset: 0.3 },
+        { transform: 'none' }
+      ], { duration: 950, easing: 'cubic-bezier(.4, 0, .2, 1)' });
+      skin.animate([{ opacity: 1 }, { opacity: 1, offset: 0.5 }, { opacity: 0 }], { duration: 950, easing: 'ease-in' }); // the plain spine gives way to the picture
+      timer = setTimeout(function () { disc.classList.add('on'); }, 860);
     }
-    // The scrollbar keeps its designed look: the thumb stays one size and rides the track as the list scrolls.
-    function sync() {
-      var max = cells.scrollHeight - cells.clientHeight, travel = sbar.clientHeight - thumb.offsetHeight;
-      thumb.style.top = (max > 1 ? (cells.scrollTop / max) * travel : 0) + 'px';
+    // Clicking the record on the stand puts it away: the disc slides back into the sleeve, the sleeve closes
+    // down to a spine again and drops into the gap it left in the shelf. The stand then waits, empty, for the
+    // next pick.
+    function putBack() {
+      if (cur < 0 || busy) return;
+      var slot = recs[cur], n = cur, settled = false;
+      function rest() {
+        if (settled) return; // the animation and its safety timer both end here; only the first one counts
+        settled = true;
+        slot.classList.remove('out'); slot.removeAttribute('aria-current');
+        cur = -1; busy = false;
+        stage.classList.add('idle');
+        info.replaceChildren(h('p', { class: 'vhint', text: 'Pick a record from the shelf.' }));
+        now.setAttribute('aria-label', 'The stand is empty');
+      }
+      clearTimeout(timer);
+      disc.classList.remove('on');
+      if (still) { rest(); return; }
+      busy = true;
+      skin.style.background = shade(n);
+      timer = setTimeout(function () { // once the disc is back inside
+        var a = slot.getBoundingClientRect(), b = sleeve.getBoundingClientRect(), dx = a.left - b.left, dy = a.top - b.top;
+        var thin = 'scale(' + (a.width / b.width) + ',' + (a.height / b.height) + ')';
+        skin.animate([{ opacity: 0 }, { opacity: 1, offset: 0.5 }, { opacity: 1 }], { duration: 900, easing: 'ease-out', fill: 'forwards' });
+        now.animate([
+          { transform: 'none' },
+          { transform: 'translate(' + dx + 'px,' + (dy - a.height * 0.95) + 'px) ' + thin, offset: 0.7 },
+          { transform: 'translate(' + dx + 'px,' + dy + 'px) ' + thin }
+        ], { duration: 900, easing: 'cubic-bezier(.4, 0, .2, 1)' }).onfinish = function () {
+          skin.getAnimations().forEach(function (an) { an.cancel(); });
+          rest();
+        };
+        setTimeout(function () { if (busy) rest(); }, 1500); // in case the tab is in the background
+      }, 520);
     }
-    function jump(e) {
-      var r = sbar.getBoundingClientRect(), size = thumb.offsetHeight;
-      var ratio = Math.min(1, Math.max(0, (e.clientY - r.top - size / 2) / (r.height - size)));
-      cells.scrollTop = ratio * (cells.scrollHeight - cells.clientHeight);
-    }    cells.addEventListener('scroll', sync);
-    window.addEventListener('resize', sync);
-    sbar.addEventListener('pointerdown', function (e) { sbar.setPointerCapture(e.pointerId); jump(e); });
-    sbar.addEventListener('pointermove', function (e) { if (sbar.hasPointerCapture(e.pointerId)) jump(e); });
-    setTimeout(sync, 300);
-    if (list.length) show(0);
-    return h('div', { class: 'win uxwin' },
-      h('div', { class: 'win-bar' }, title, UI.controls()),
-      h('div', { class: 'ux' }, view, h('div', { class: 'pane side' }, cells, sbar)));
-  }
-  function developer(list) {
+    now.setAttribute('role', 'button'); now.tabIndex = 0;
+    now.addEventListener('click', putBack);
+    now.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); putBack(); } });
+    // The shelf. Projects are shared out three to a cubby, mixed in with plain white records. Cubbies take
+    // turns stacking from the left and the right, one record in most groups leans, and one cubby stays bare.
+    var per = 3, need = Math.ceil(list.length / per), rowsN = Math.max(2, Math.ceil((need + 1) / cols)), cubs = rowsN * cols;
+    var bare = cubs > need ? cubs - 2 : -1; // the cubby left empty, second to last
+    var unit = h('div', { class: 'vunit', style: '--cubs:' + cols });
+    function plain(lean) { return h('span', { class: 'vrec plain' + (lean ? ' lean' : ''), 'aria-hidden': 'true' }); }
+    var next = 0;
+    for (var c = 0; c < cubs; c++) {
+      var cub = h('div', { class: 'vcub' + (c % 2 ? ' right' : '') + (c >= cubs - cols ? ' floor' : '') });
+      if (c !== bare && next < list.length) {
+        for (var e = 0; e < 1 + c % 3; e++) cub.appendChild(plain());
+        for (var i = 0; i < per && next < list.length; i++, next++) {
+          (function (n, p) {
+            var b = h('button', { class: 'vrec', type: 'button', style: 'background:' + shade(n), 'aria-label': (p.title || 'Project ' + (n + 1)) + ', take it off the shelf',
+              onclick: function () { show(n, b); } }, h('span', { text: p.title || 'Project ' + (n + 1) }));
+            recs[n] = b; cub.appendChild(b);
+          })(next, list[next]);
+          if (i === 0 && c % 2 === 0) cub.appendChild(plain());
+        }
+        cub.appendChild(plain(true));
+      } else if (c !== bare) { for (var q = 0; q < 4; q++) cub.appendChild(plain(q === 3)); }
+      unit.appendChild(cub);
+    }
+    for (var k = 0; k <= cols; k++) unit.appendChild(h('i', { class: 'vpost', style: 'left:' + (k / cols * 100) + '%', 'aria-hidden': 'true' })); // the uprights
+    show(0);
+    return h('div', { class: 'vshelf' }, stage, unit);
+  }  function developer(list) {
     var grid = h('div', { class: 'folders' });
     // Each folder is a back, a few sheets and a front flap. Hovering tips the flap forward so the sheets
     // show, with a note of how many pages are inside.
@@ -1167,11 +1487,11 @@
     CATS.forEach(function (c, i) {
       var list = byCat(c);
       var body;
-      if (c === 'uiux') body = uiux(list, s.roles[i]);
+      if (c === 'uiux') body = uiux(list);
       else if (!list.length && c !== 'developer') body = h('p', { class: 'empty', text: 'New work coming soon.' });
       else body = render[c](list);
       parts.push(h('section', { class: 'section' + (c === 'developer' ? ' dev' : ''), id: c },
-        c === 'uiux' ? h('h3', { class: 'sr-only', text: s.roles[i] }) : h('h2', { text: s.roles[i] }), body));
+        h('h2', { text: s.roles[i] }), body));
     });
     return parts;
   }
