@@ -50,7 +50,10 @@
         a.classList.toggle('on-dark', image >= 2 || lum / Math.max(1, 3 - image) < 150);
       });
     }
-    function queue() { if (!queued) { queued = true; requestAnimationFrame(update); } }
+    // Working out what is behind each menu item means asking the browser what is at nine points of the page.
+    // On a computer that is done every frame of a scroll; on a phone a few times a second is plenty.
+    var patient = window.matchMedia('(pointer: coarse)').matches;
+    function queue() { if (!queued) { queued = true; if (patient) setTimeout(update, 130); else requestAnimationFrame(update); } }
     window.addEventListener('scroll', queue, { passive: true });
     window.addEventListener('resize', queue);
     setInterval(update, 700); // also catches things that move under it without scrolling
@@ -359,17 +362,25 @@
     var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var W = 0, H = 0, S = 0, dpr = 1, G = 8, cols = 0, rows = 0, field = null, balls = [], raf = 0, born = 0, seen = true, topY = 0, navY = 0;
     var mid = { x: 0, y: 0, vx: 0, vy: 0 }, ptr = { x: 0, y: 0, on: false }, parked = false, floorY = 1e9, beat = 0, nextBeat = 0, lastT = 0, sim = 0, acc = 0, prev = 0, ink = 1, inkTo = 1, anchor = null, blank = false;
+    var lite = false, img = null, px = null, box = null;
     hero.insertBefore(canvas, hero.firstChild);
     function rnd(a, b) { return a + Math.random() * (b - a); }
     function size() {
       var r = hero.getBoundingClientRect();
       W = r.width; H = r.height; S = Math.min(W, H);
-      // a phone gets a slightly softer picture and a coarser grid: it looks the same in motion and costs far less
-      var phone = window.matchMedia('(pointer: coarse)').matches;
-      dpr = Math.min(phone ? 1.5 : 2, window.devicePixelRatio || 1);
-      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
-      G = phone ? Math.max(6, Math.round(S / 70)) : Math.max(4, Math.round(S / 150));
-      cols = Math.ceil(W / G) + 1; rows = Math.ceil(H / G) + 1;
+      // On a phone the liquid is painted a different, much cheaper way (see drawLite): a small picture, one
+      // dot for every 2 x 2 points of screen, that the phone's graphics chip stretches to full size.
+      lite = window.matchMedia('(pointer: coarse)').matches;
+      if (lite) {
+        G = 2; cols = Math.ceil(W / G); rows = Math.ceil(H / G);
+        canvas.width = cols; canvas.height = rows;
+        img = ctx.createImageData(cols, rows); px = new Uint32Array(img.data.buffer); box = null;
+      } else {
+        dpr = Math.min(2, window.devicePixelRatio || 1);
+        canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+        G = Math.max(4, Math.round(S / 150));
+        cols = Math.ceil(W / G) + 1; rows = Math.ceil(H / G) + 1;
+      }
       field = new Float32Array(cols * rows);
       // keep the liquid clear of the menu, whether the menu sits along the top or (on a phone) the bottom
       var navEl = hero.querySelector('.nav .glass'), nr = navEl ? navEl.getBoundingClientRect() : null;
@@ -423,7 +434,48 @@
         if (b.y > fl) { b.y = fl; b.vy = -Math.abs(b.vy) * 0.3; }
       }
     }
+    // The phone version of draw(). It works out the same "how much liquid is here" number, but for each dot of
+    // a small picture, and simply colours the dots that are inside. There are no outlines to trace, fill or
+    // clip, which is what made the full version heavy when the blob was large. Only the part of the picture
+    // the liquid touches (now, or a frame ago) is redone.
+    function drawLite(t) {
+      var grow = still ? 1 : Math.min(1, (t - born) / 1.6), i, j, n;
+      grow = 1 - Math.pow(1 - grow, 3);
+      ink += (inkTo - ink) * 0.2;
+      var bi0 = cols, bi1 = -1, bj0 = rows, bj1 = -1;
+      field.fill(0);
+      for (n = 0; n < balls.length; n++) {
+        var b = balls[n], rr = b.r * S * grow * ink * (b.big ? 1 + 0.16 * Math.sin(t * 3.4 + b.p) + beat * 0.12 : 1), r2 = rr * rr;
+        if (rr < 0.4) continue;
+        var reach = rr * 4.6, i0 = Math.max(0, Math.floor((b.x - reach) / G)), i1 = Math.min(cols - 1, Math.ceil((b.x + reach) / G));
+        var j0 = Math.max(0, Math.floor((b.y - reach) / G)), j1 = Math.min(rows - 1, Math.ceil((b.y + reach) / G));
+        if (i1 < i0 || j1 < j0) continue;
+        if (i0 < bi0) bi0 = i0; if (i1 > bi1) bi1 = i1; if (j0 < bj0) bj0 = j0; if (j1 > bj1) bj1 = j1;
+        for (j = j0; j <= j1; j++) {
+          var dy = (j + 0.5) * G - b.y, dy2 = dy * dy + 0.01, row = j * cols;
+          for (i = i0; i <= i1; i++) { var dx = (i + 0.5) * G - b.x; field[row + i] += r2 / (dx * dx + dy2); }
+        }
+      }
+      var now = bi1 >= bi0 ? [bi0, bj0, bi1, bj1] : null, a0, a1, c0, c1;
+      if (!now && !box) return;
+      a0 = Math.min(now ? now[0] : cols, box ? box[0] : cols); c0 = Math.min(now ? now[1] : rows, box ? box[1] : rows);
+      a1 = Math.max(now ? now[2] : -1, box ? box[2] : -1); c1 = Math.max(now ? now[3] : -1, box ? box[3] : -1);
+      var hx = mid.x - S * 0.04, hy = mid.y - S * 0.06, hr2 = S * 0.13 * S * 0.13; // the soft sheen that makes it look wet
+      for (j = c0; j <= c1; j++) {
+        var rw = j * cols, py = (j + 0.5) * G - hy, py2 = py * py;
+        for (i = a0; i <= a1; i++) {
+          var f = field[rw + i];
+          if (f < 0.88) { px[rw + i] = 0; continue; }
+          var al = f >= 1.12 ? 255 : ((f - 0.88) / 0.24 * 255) | 0, qx = (i + 0.5) * G - hx, d2 = qx * qx + py2;
+          var g = d2 < hr2 ? (51 * (1 - Math.sqrt(d2 / hr2))) | 0 : 0;
+          px[rw + i] = (al << 24 | g << 16 | g << 8 | g) >>> 0;
+        }
+      }
+      ctx.putImageData(img, 0, 0, a0, c0, a1 - a0 + 1, c1 - c0 + 1);
+      box = now;
+    }
     function draw(t) {
+      if (lite) { drawLite(t); return; }
       var grow = still ? 1 : Math.min(1, (t - born) / 1.6), i, j, n;
       grow = 1 - Math.pow(1 - grow, 3);
       ink += (inkTo - ink) * 0.2; // how much of the liquid is still on the cover; the rest has gone to the name tube
@@ -482,7 +534,7 @@
       var t = now / 1000, guard = 0;
       acc += Math.min(0.2, prev ? t - prev : 0); prev = t;
       // While every drop of it is away in the name tube there is nothing to move or draw: wipe once and idle.
-      if (inkTo <= 0 && ink < 0.01) { if (!blank) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); blank = true; } ink = 0; acc = 0; raf = requestAnimationFrame(frame); return; }
+      if (inkTo <= 0 && ink < 0.01) { if (!blank) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); if (px) { px.fill(0); box = null; } blank = true; } ink = 0; acc = 0; raf = requestAnimationFrame(frame); return; }
       blank = false;
       while (acc >= 1 / 60 && guard++ < 10) { sim += 1 / 60; step(sim); acc -= 1 / 60; }
       draw(t);
@@ -910,6 +962,9 @@
 
     window.addEventListener('pointermove', function (e) {
       if (!box) return;
+      // Mouse only. A finger starting a scroll over the logo also counts as a pointer moving, and since a finger
+      // never "moves away", it used to leave this whole full-screen warp redrawing forever on phones.
+      if (e.pointerType && e.pointerType !== 'mouse') return;
       var hr = hero.getBoundingClientRect(), x = e.clientX - hr.left, y = e.clientY - hr.top;
       ptr.vx = Math.max(-28, Math.min(28, x - ptr.x));
       ptr.vy = Math.max(-28, Math.min(28, y - ptr.y));
