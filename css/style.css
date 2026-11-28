@@ -789,4 +789,15 @@ html.locked, html.locked body { overflow: hidden; }
 .nametube canvas { display: block; filter: url(#goo-fine); }
 @media (prefers-reduced-motion: reduce) { .nametube { transition: none; } }
 /* the ink crossing the screen between the cover and the name tube */
-.inkpour { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 30; pointer-events: none; display: none; filter: url(#goo-pour); }
+.inkpour { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none; display: none; will-change: transform; }
+/* ===== version 46: lighter on phones. Phone browsers apply blur filters on the processor, frame by frame, and the menu drop,
+   the name tube and the ink stream all change at the same moment of the scroll. On touch devices those effects are swapped
+   for ones the graphics chip can do for free, so scrolling through that moment stays smooth. ===== */
+@media (pointer: coarse) {
+  .nav .drops { filter: none; }
+  .nav .drop { box-shadow: 0 0 0 1px rgba(0, 0, 0, .55), 0 2px 4px rgba(0, 0, 0, .3); }
+  .nav .bead { display: none; }
+  .nametube { -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(180deg, rgba(255, 255, 255, .94), rgba(242, 242, 242, .88)); transform: translateY(-10px); transition: opacity .35s ease, transform .35s ease; }
+  .nametube.on { transform: none; }
+  .nametube canvas { filter: none; }
+}

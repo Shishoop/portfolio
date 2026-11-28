@@ -159,7 +159,7 @@
     }
     // one droplet breaks off the back of the drop and catches up; never more than one at a time
     function droplet(fromMid, toMid) {
-      if (busy || Math.abs(toMid - fromMid) < 30) return;
+      if (busy || Math.abs(toMid - fromMid) < 30 || window.matchMedia('(pointer: coarse)').matches) return;
       busy = true;
       var size = glass.clientHeight * 0.34;
       var bead = h('i', { class: 'bead', style: 'width:' + size + 'px;height:' + size + 'px;margin:' + (-size / 2) + 'px 0 0 ' + (-size / 2) + 'px;left:' + fromMid + 'px' });
@@ -358,15 +358,17 @@
     var canvas = h('canvas', { class: 'ferro', 'aria-hidden': 'true' }), ctx = canvas.getContext('2d');
     var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var W = 0, H = 0, S = 0, dpr = 1, G = 8, cols = 0, rows = 0, field = null, balls = [], raf = 0, born = 0, seen = true, topY = 0, navY = 0;
-    var mid = { x: 0, y: 0, vx: 0, vy: 0 }, ptr = { x: 0, y: 0, on: false }, parked = false, floorY = 1e9, beat = 0, nextBeat = 0, lastT = 0, sim = 0, acc = 0, prev = 0, ink = 1, inkTo = 1, anchor = null;
+    var mid = { x: 0, y: 0, vx: 0, vy: 0 }, ptr = { x: 0, y: 0, on: false }, parked = false, floorY = 1e9, beat = 0, nextBeat = 0, lastT = 0, sim = 0, acc = 0, prev = 0, ink = 1, inkTo = 1, anchor = null, blank = false;
     hero.insertBefore(canvas, hero.firstChild);
     function rnd(a, b) { return a + Math.random() * (b - a); }
     function size() {
       var r = hero.getBoundingClientRect();
       W = r.width; H = r.height; S = Math.min(W, H);
-      dpr = Math.min(2, window.devicePixelRatio || 1);
+      // a phone gets a slightly softer picture and a coarser grid: it looks the same in motion and costs far less
+      var phone = window.matchMedia('(pointer: coarse)').matches;
+      dpr = Math.min(phone ? 1.5 : 2, window.devicePixelRatio || 1);
       canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
-      G = Math.max(4, Math.round(S / 150));
+      G = phone ? Math.max(6, Math.round(S / 70)) : Math.max(4, Math.round(S / 150));
       cols = Math.ceil(W / G) + 1; rows = Math.ceil(H / G) + 1;
       field = new Float32Array(cols * rows);
       // keep the liquid clear of the menu, whether the menu sits along the top or (on a phone) the bottom
@@ -479,6 +481,9 @@
       // liquid moves at the same speed on a slow laptop and on a 120 Hz phone.
       var t = now / 1000, guard = 0;
       acc += Math.min(0.2, prev ? t - prev : 0); prev = t;
+      // While every drop of it is away in the name tube there is nothing to move or draw: wipe once and idle.
+      if (inkTo <= 0 && ink < 0.01) { if (!blank) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); blank = true; } ink = 0; acc = 0; raf = requestAnimationFrame(frame); return; }
+      blank = false;
       while (acc >= 1 / 60 && guard++ < 10) { sim += 1 / 60; step(sim); acc -= 1 / 60; }
       draw(t);
       raf = requestAnimationFrame(frame);
@@ -565,8 +570,11 @@
     var canvas = h('canvas', { 'aria-hidden': 'true' }), ctx = canvas.getContext('2d');
     var tube = h('a', { class: 'nametube', href: '#', 'aria-label': text + ', back to the top' }, canvas);
     var pour = h('canvas', { class: 'inkpour', 'aria-hidden': 'true' }), pctx = pour.getContext('2d');
-    var W = 0, H = 0, dpr = 1, drops = [], shapes = [], drips = [], raf = 0, last = 0, ptr = null, face = '', size = 0, mouth = 0;
-    var want = 0, fill = 0, prog = 0, loose = 0, slosh = 0, sloshV = 0, lastY = window.scrollY, nextDrip = 0, from = null, respawn = false;
+    var W = 0, H = 0, dpr = 1, drops = [], shapes = [], drips = [], raf = 0, last = 0, ptr = null, face = '', size = 0, mouth = 0, fat = 1;
+    var want = 0, fill = 0, prog = 0, loose = 0, slosh = 0, sloshV = 0, lastY = window.scrollY, nextDrip = 0, from = null, respawn = false, pouring = false;
+    var light = window.matchMedia('(pointer: coarse)').matches; // a phone or tablet: do the same thing with less
+    var pace = 0.016, seenFrames = 0, cheap = light; // phones start in the light mode; computers drop to it only if they struggle
+    if (cheap) canvas.style.filter = 'none';
     // The lettering. To use another typeface (for example a licensed liquid display font), add it to the
     // page with @font-face and put its name first in this list.
     var FAMILY = 'Jost, sans-serif', WEIGHT = 600;
@@ -575,7 +583,7 @@
       var svg = h('div', { 'aria-hidden': 'true', style: 'position:absolute;width:0;height:0;overflow:hidden' });
       svg.innerHTML = '<svg width="0" height="0"><filter id="goo-fine"><feGaussianBlur in="SourceGraphic" stdDeviation="1"/>' +
         '<feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 15 -5.5"/></filter>' +
-        '<filter id="goo-pour"><feGaussianBlur in="SourceGraphic" stdDeviation="5"/><feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8"/></filter></svg>';
+        '</svg>';
       document.body.appendChild(svg);
     }
     document.body.append(pour, tube);
@@ -598,7 +606,9 @@
       off.width = W * k; off.height = H * k;
       o.scale(k, k); o.font = face; o.textBaseline = 'middle';
       shapes.forEach(function (s) { if (s.img) o.drawImage(flower, s.x, H / 2 - s.w / 2, s.w, s.w); else o.fillText(s.ch, s.x, H / 2 + fs * 0.04); });
-      var d = o.getImageData(0, 0, off.width, off.height).data, gap = 1.3;
+      // (on a phone the drops are a little larger and fewer: about a third less to move and draw every frame)
+      var d = o.getImageData(0, 0, off.width, off.height).data, gap = light ? 1.62 : 1.3;
+      fat = gap / 1.3;
       drops = []; drips = [];
       for (var y = gap / 2; y < H; y += gap) for (var x = gap / 2; x < W; x += gap) {
         if (d[(Math.round(y * k) * off.width + Math.round(x * k)) * 4 + 3] < 120) continue;
@@ -606,7 +616,6 @@
         for (i = 0; i < shapes.length; i++) if (x >= shapes[i].x - 0.5) si = i;
         drops.push({ tx: x, ty: y, hx: mouth + Math.cos(an) * r, hy: H / 2 + Math.sin(an) * r * 0.8, wait: x / W * 0.62 + Math.random() * 0.1, ph: Math.random() * 6.283, ox: 0, oy: 0, vx: 0, vy: 0, si: si, low: y > H / 2 + fs * 0.12 });
       }
-      pour.width = window.innerWidth; pour.height = window.innerHeight;
     }
     // How far shape i is riding up or down right now: a wave that keeps rolling along the tube.
     function ride(i, t) { return Math.sin(t * 2.4 - i * 0.62) * size * 0.11 + Math.sin(t * 1.5 + i * 1.9) * size * 0.045; }
@@ -615,26 +624,49 @@
     // The ink crossing the screen between the cover and the mouth of the tube: a string of blobs, fat at the
     // cover end and thin where it enters the glass. `amount` runs 0 to 1 over the pour.
     function stream(amount, inward) {
-      pctx.clearRect(0, 0, pour.width, pour.height);
-      if (amount <= 0 || amount >= 1 || !from) { pour.style.display = 'none'; return; }
-      pour.style.display = 'block';
+      if (amount <= 0 || amount >= 1 || !from) { if (pouring) { pour.style.display = 'none'; pouring = false; } return; }
       var mx = tube.offsetLeft + mouth, my = tube.offsetTop + H / 2, sx = from.x, sy = from.y;
       var cx2 = mx + (sx - mx) * 0.55, cy2 = Math.min(sy, my) + Math.abs(sy - my) * 0.2 + 46; // the curve it follows
+      // Drawn on a canvas only as big as the stream itself, as one smooth shape. (It used to be a row of
+      // blobs blurred together across the whole screen, which was far too much work for a phone.)
+      var pad = 20, x0 = Math.floor(Math.min(mx, sx, cx2) - pad), y0 = Math.floor(Math.min(my, sy, cy2) - pad);
+      var cw = Math.ceil((Math.max(mx, sx, cx2) + pad - x0) / 48) * 48, chh = Math.ceil((Math.max(my, sy, cy2) + pad - y0) / 48) * 48, pd = Math.min(1.5, dpr);
+      if (pour.width < Math.round(cw * pd) || pour.height < Math.round(chh * pd)) { // it only ever grows, so scrolling mid-pour never makes it be thrown away and rebuilt
+        var gw = Math.max(cw, pour.width / pd), gh = Math.max(chh, pour.height / pd);
+        pour.width = Math.round(gw * pd); pour.height = Math.round(gh * pd); pour.style.width = gw + 'px'; pour.style.height = gh + 'px';
+      }
+      pour.style.transform = 'translate(' + x0 + 'px,' + y0 + 'px)';
+      if (!pouring) { pour.style.display = 'block'; pouring = true; }
+      pctx.setTransform(1, 0, 0, 1, 0, 0); pctx.clearRect(0, 0, pour.width, pour.height);
+      pctx.setTransform(pd, 0, 0, pd, -x0 * pd, -y0 * pd);
       var q = inward ? amount : 1 - amount, head = Math.min(1, q * 1.5), tail = Math.max(0, q * 1.5 - 0.5);
       head = head * head * (3 - 2 * head); tail = tail * tail * (3 - 2 * tail);
-      pctx.fillStyle = '#000'; pctx.beginPath();
-      for (var j = 0; j <= 34; j++) {
-        var u = tail + (head - tail) * j / 34, w = inward ? u : 1 - u, m = 1 - w; // w runs from the cover (0) to the tube (1)
+      var N = 22, L = [], R = [], ends = [];
+      for (var j = 0; j <= N; j++) {
+        var u = tail + (head - tail) * j / N, w = inward ? u : 1 - u, m = 1 - w; // w runs from the cover (0) to the tube (1)
         var x = m * m * sx + 2 * m * w * cx2 + w * w * mx, y = m * m * sy + 2 * m * w * cy2 + w * w * my;
-        var rad = (13 - 9 * w) * (0.75 + 0.25 * Math.sin(j * 1.7 + amount * 20));
-        x += Math.sin(j * 0.9 + amount * 14) * 3 * (1 - w);
-        pctx.moveTo(x + rad, y); pctx.arc(x, y, rad, 0, 6.2832);
+        var tx = 2 * m * (cx2 - sx) + 2 * w * (mx - cx2), ty = 2 * m * (cy2 - sy) + 2 * w * (my - cy2), tl = Math.sqrt(tx * tx + ty * ty) || 1;
+        var half = (12 - 8.5 * w) * (0.78 + 0.22 * Math.sin(j * 1.3 + amount * 18)) * Math.sin(Math.PI * Math.min(1, (j + 0.6) / N * 1.15)) + 1.5; // fat at the cover, thin at the glass, swelling as it runs
+        L.push(x - ty / tl * half, y + tx / tl * half); R.push(x + ty / tl * half, y - tx / tl * half);
+        if (j === 0 || j === N) ends.push(x, y, half);
       }
+      pctx.fillStyle = '#000'; pctx.beginPath();
+      pctx.moveTo(L[0], L[1]);
+      for (j = 2; j < L.length; j += 2) pctx.lineTo(L[j], L[j + 1]);
+      for (j = R.length - 2; j >= 0; j -= 2) pctx.lineTo(R[j], R[j + 1]);
+      pctx.closePath();
+      pctx.moveTo(ends[0] + ends[2], ends[1]); pctx.arc(ends[0], ends[1], ends[2], 0, 6.2832);       // rounded ends
+      pctx.moveTo(ends[3] + ends[5], ends[4]); pctx.arc(ends[3], ends[4], ends[5], 0, 6.2832);
       pctx.fill();
-    }
-    function frame(now) {
+    }    function frame(now) {
       raf = 0;
       var dt = Math.min(0.05, (now - last) / 1000 || 0), t = now / 1000, i;
+      // Keep an eye on how long frames are really taking. If this device cannot keep up (under about 40 a
+      // second for a while), stop blurring the drops together: the name looks slightly grainier but moves smoothly.
+      if (last && !cheap) {
+        pace = pace * 0.92 + Math.min(0.1, (now - last) / 1000) * 0.08;
+        if (++seenFrames > 50 && pace > 0.026) { cheap = true; canvas.style.filter = 'none'; }
+      }
       last = now;
       // The order of events. Going in: the ink pours into the tube and pools, and only then gathers into the
       // name. Going out: the name melts back to the pool first, and only then pours away.
@@ -712,16 +744,16 @@
         if (fx < 3) { p.ox += 3 - fx; p.vx = Math.abs(p.vx) * 0.5; fx = 3; } else if (fx > W - 3) { p.ox -= fx - (W - 3); p.vx = -Math.abs(p.vx) * 0.5; fx = W - 3; }
         if (fy < 3) { p.oy += 3 - fy; p.vy = Math.abs(p.vy) * 0.5; fy = 3; } else if (fy > H - 3) { p.oy -= fy - (H - 3); p.vy = -Math.abs(p.vy) * 0.5; fy = H - 3; }
         // drops are fatter while pooled, and the pool is only as big as the ink that has arrived so far
-        var rad = ((1.9 - 0.95 * e) * (p.fall ? 1.4 : 1) + 0.45 * sf * e) * (e > 0 ? 1 : pool);
+        var rad = ((1.9 - 0.95 * e) * (p.fall ? 1.4 : 1) + 0.45 * sf * e) * (e > 0 ? 1 : pool) * fat;
         if (rad < 0.15) continue;
         ctx.moveTo(fx + rad, fy);
         ctx.arc(fx, fy, rad, 0, 6.2832);
       }
       ctx.fill();
-      if (!want && fill <= 0) { tube.classList.remove('on'); pour.style.display = 'none'; return; } // empty: stop until wanted again
+      if (!want && fill <= 0) { tube.classList.remove('on'); pour.style.display = 'none'; pouring = false; return; } // empty: stop until wanted again
       if (!document.hidden) raf = requestAnimationFrame(frame);
     }
-    function wake() { if (!raf && (want || fill > 0)) { last = performance.now(); raf = requestAnimationFrame(frame); } }
+    function wake() { if (!raf && (want || fill > 0)) { last = 0; raf = requestAnimationFrame(frame); } } // (0: the pause before this does not count as a slow frame)
     function check() {
       var y = window.scrollY, now = y > window.innerHeight * 0.5 ? 1 : 0;
       sloshV += Math.max(-40, Math.min(40, y - lastY)) * 0.06; lastY = y;
